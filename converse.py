@@ -88,7 +88,10 @@ messages = []
 assistant_name = 'assistant'
 text_scroll_offset = 0
 CHAT_LOG = 'chat_engine.log'
-previous_log_mtime = os.path.getmtime(CHAT_LOG)
+try:
+    previous_log_mtime = os.path.getmtime(CHAT_LOG)
+except:
+    previous_log_mtime = 0
 LISTENING_CONFIRMED = False
 
 # Task queue
