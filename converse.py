@@ -1,7 +1,7 @@
 # turk-chat Conversation Agent
 # (C) 2023 Kerry Fraser-Robinson
 
-VERSION = '0.4.0'
+VERSION = '0.4.1'
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import time, pygame, threading
@@ -10,6 +10,9 @@ import shutil       # File system operation (file movement)
 import json, glob   # JSON and file system operation (message log)
 
 PLAYED_AUDIO_ARCHIVE = 'audio_out/'
+if not os.path.exists(PLAYED_AUDIO_ARCHIVE):  os.makedirs(PLAYED_AUDIO_ARCHIVE)
+RECORDED_AUDIO_ARCHIVE = 'audio_in/'
+if not os.path.exists(RECORDED_AUDIO_ARCHIVE):  os.makedirs(RECORDED_AUDIO_ARCHIVE)
 
 import numpy as np  # Visualisation processing
 import wave         # Visualisation processing
@@ -82,16 +85,22 @@ font = pygame.font.Font(None, 36)
 original_surface = pygame.Surface(RESCALE_RESOLUTION)
 
 amplitude = 0
-
 previously_played = None
 messages = []
 assistant_name = 'assistant'
 text_scroll_offset = 0
+
 CHAT_LOG = 'chat_engine.log'
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 try:
     previous_log_mtime = os.path.getmtime(CHAT_LOG)
 except:
-    previous_log_mtime = 0
+    now = time.localtime()
+    month_name = MONTHS[now.tm_mon - 1]  # tm_mon ranges from 1 to 12
+    with open(CHAT_LOG, 'w') as file:
+        file.write(f"New session at {now.tm_year}-{month_name}-{now.tm_mday:02d}:{now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}")
+    previous_log_mtime = time.time()
+
 LISTENING_CONFIRMED = False
 
 # Task queue
