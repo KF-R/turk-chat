@@ -1,7 +1,7 @@
 # turk-chat Conversation Agent
 # (C) 2023 Kerry Fraser-Robinson
 
-VERSION = '0.4.1'
+VERSION = '0.4.2'
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import time, pygame, threading
@@ -304,7 +304,6 @@ def wrap_text(text: str, width: int = 40) -> str:
 
 def read_message_log(filename: str) -> str:
     """ Also updates `messages` global """
-    global messages
     messages = []
     try:
         with open(filename, 'r') as file:
@@ -322,7 +321,7 @@ def read_message_log(filename: str) -> str:
     except Exception as e:
         return f"Error: An unexpected error occurred: {e}"
 
-    return "\n".join(f"{record['role']}: {record['content']}" for record in messages)
+    return messages
 
 def bounding_rect(rect1, rect2):
     return pygame.Rect(min(rect1.left, rect2.left), min(rect1.top, rect2.top),
@@ -361,7 +360,7 @@ if __name__ == "__main__":
     status_line = ''
     message_file = glob.glob('*.json')
     if message_file:
-        message_log = read_message_log(message_file[0]) # Also refreshes `messages` global
+        messages = read_message_log(message_file[0]) 
         assistant_name = message_file[0].split('.')[0]
 
     while running:
@@ -399,11 +398,7 @@ if __name__ == "__main__":
         # Window elements:
         if status_line: print_at(original_surface, 8, WINDOW_RESOLUTION[1] - 8 - 28, f" {status_line} ", 28, YELLOW, GREY, 8, BLACK)
         
-        if messages:
-            message_box = display_message_tail(original_surface, 4, 4 - text_scroll_offset, DARK_GREY, 4, DARK_GREY)
-            if message_box.bottom > PANEL_POSITION[1] - MESSAGE_FONT_SIZE:
-                text_scroll_offset += 1
-
+        # Chat engine log pass-through
         try:
             if os.path.getmtime(CHAT_LOG) != previous_log_mtime:
                 with open(CHAT_LOG, 'r') as file:
@@ -436,6 +431,11 @@ if __name__ == "__main__":
             # pygame.draw.circle(original_surface, RED, (PANEL_POSITION[0] + PANEL_WIDTH // 2, PANEL_POSITION[1] + PANEL_HEIGHT), amplitude, amplitude // 2, draw_top_left=True, draw_top_right=True, draw_bottom_left=False, draw_bottom_right=False)
             draw_gradient_circle(original_surface, RED, BLACK, (PANEL_POSITION[0] + PANEL_WIDTH // 2, PANEL_POSITION[1] + PANEL_HEIGHT), amplitude, amplitude // 2, draw_top_left=True, draw_top_right=True, draw_bottom_left=False, draw_bottom_right=False)
 
+        if messages:
+            message_box = display_message_tail(original_surface, 4, 4 - text_scroll_offset, DARK_GREY, 4, DARK_GREY)
+            if message_box.bottom > PANEL_POSITION[1] - MESSAGE_FONT_SIZE:
+                text_scroll_offset += 1
+
         # Render scaled frame
         print_at(original_surface, WINDOW_RESOLUTION[0] - 64, WINDOW_RESOLUTION[1] - 16, f" {fps:05.2f} ", 16, BLACK, GREY, 4, BLACK)
         render()
@@ -448,14 +448,13 @@ if __name__ == "__main__":
             # print(f"Last recorded file: {next_output_filename}")
             previously_played = next_output_filename
 
-            try:
-                message_log = read_message_log(message_file[0]) # Refresh `messages`
-            except:
-                pass
-
             status_line = 'Talking'
             enqueue_task(play_sound_with_visualization, (next_output_filename,), playback_complete )
 
+            message_file = glob.glob('*.json')
+            if message_file: messages = read_message_log(message_file[0]) # Refresh `messages`
+  
+   
         clock.tick(FPS)
 
     # Try to terminate the subprocess gracefully
