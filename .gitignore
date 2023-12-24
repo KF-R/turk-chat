@@ -1,6 +1,7 @@
 *.wav
-*.log
 *.mp3
+*.log
+*.json
 __pycache__
 audio_in
 audio_out

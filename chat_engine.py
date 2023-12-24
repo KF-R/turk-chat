@@ -134,10 +134,6 @@ def signal_handler(sig, frame):
         print_log('SIGTERM received. Shutting down gracefully...')
     LISTENING = False
 
-def is_loud(data):
-    """Check if the audio chunk is above the threshold."""
-    return np.mean(np.abs(data)) > THRESHOLD
-
 def extract_audio(ring_buffer, start_index, end_index, buffer_size):
     """Extract audio from the ring buffer handling wrap-around."""
     if end_index >= start_index:
@@ -228,7 +224,7 @@ def run_listen_loop():
         write_index += 1
 
         # Check volume
-        if is_loud(audio_chunk):
+        if np.mean(np.abs(audio_chunk)) > THRESHOLD:
             if not is_above_threshold:
                 print_log(f"Audio detected.")
                 start_time = time.time()
