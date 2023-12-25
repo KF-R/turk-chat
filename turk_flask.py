@@ -44,8 +44,6 @@ response = ''
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-
-
 def extract_codeblocks(text):
     strings = []
     # replacement_template = 'snippet_{}.txt'  # template for numbered replacement strings
@@ -181,5 +179,15 @@ def response_file(filename):
         # Log an error message or return a custom 404 error
         return "File not found", 404
 
+@app.route('/<filename>.json')
+def message_log_file(filename):
+    try:
+        secure_filename_str = secure_filename(f"{filename}.json")
+        return send_from_directory('.', secure_filename_str)
+    except FileNotFoundError:
+        # Log an error message or return a custom 404 error
+        return "File not found", 404
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', ssl_context='adhoc')
+
