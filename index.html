@@ -4,9 +4,13 @@
 <meta charset="UTF-8">
 <title>Speech Detector</title>
 <style>
+    body {
+        background-color: darkgrey;
+    }
     #status {
         padding: 10px;
         color: white;
+        width: 420px;
     }
     .listening {
         background-color: blue;
@@ -17,12 +21,63 @@
     .stopped {
         background-color: grey;
     }
+    
+    /* button styling */
+    button {
+        padding: 10px 20px;
+        font-size: 16px;
+        color: white;
+        background-color: #007bff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+
+    .message {
+    margin-bottom: 10px;
+    padding: 5px;
+    border-radius: 5px;
+    }
+
+.system-message {
+    background-color: lightgrey;
+    }
+
+.user-message {
+    background-color: lightblue;
+    text-align: right;
+    }
+
+.assistant-message {
+    background-color: lightgreen;
+    }
+
+#messages {
+    background-color: grey;    
+    width: 420px;
+    }
+
+.scrollable {
+    max-height: 300px; /* Adjust height as needed */
+    overflow-y: scroll;
+    border: 1px solid #ccc; /* Just for visibility */
+    padding: 10px;
+  }
+
 </style>
 </head>
 <body>
-<h1>Speech Detector</h1>
+<h1>Web Converse</h1>
 <button id="startButton">Start Listening</button>
+<hr //>
 <div id="status" class="stopped">Status: Stopped</div>
+<canvas id="vuMeter"></canvas>
+<hr //>
+<div id="messages" class="scrollable">&nbsp;</div>
 <script>
 // Set up necessary variables and constants
 let isRecording = false;
@@ -40,6 +95,8 @@ const statusDiv = document.getElementById('status');
 let started = false; // Track if audio has started
 let RETRY_TIMEOUT = 1000 // Keep checking for responses at this frequency if first check failed
 let RESPONSE_DELAY = 3000 // How long to wait before checking for a response after submission
+// let ENDPOINT = "https://localhost:5000/upload"
+let ENDPOINT = window.location.href + 'upload'
 
 document.getElementById('startButton').addEventListener('click', () => {
     if(!started) {
@@ -48,9 +105,22 @@ document.getElementById('startButton').addEventListener('click', () => {
         started = true;
         initializeMedia();
     } else {
-        audioContext.resume();
+        // audioContext.resume();
+        stopRecording()
+        document.getElementById('startButton').innerText = 'Resume Listening'
     }
 });
+loadAndDisplayChatLog('joanne.json');
+
+document.addEventListener("DOMContentLoaded", function() {
+  var element = document.getElementById("scrollableDiv");
+  element.scrollTop = element.scrollHeight;
+});
+
+function updateScroll(){
+    var element = document.getElementById("content");
+    element.scrollTop = element.scrollHeight;
+}
 
 function initializeMedia() {
     navigator.mediaDevices.getUserMedia({audio: true})
@@ -83,6 +153,7 @@ function startRecording() {
     statusDiv.innerText = "Status: Listening";
     statusDiv.classList.remove("stopped");
     statusDiv.classList.add("listening");
+    document.getElementById('startButton').innerText = 'Stop Listening'
 }
 
 function stopRecording() {
@@ -133,6 +204,7 @@ function handleStop() {
     statusDiv.innerText = "Status: Processing...";
     statusDiv.classList.remove("recording");
     statusDiv.classList.add("stopped");
+    document.getElementById('startButton').disabled = true
 }
 
 function sendDataToServer(blob, startTime) {
@@ -141,7 +213,7 @@ function sendDataToServer(blob, startTime) {
     formData.append("audio", blob, wav_filename);
 
     // Adjust URL to your server's endpoint
-    fetch("http://localhost:5000/upload", {
+    fetch(ENDPOINT, {
         method: "POST",
         body: formData
     })
@@ -150,6 +222,8 @@ function sendDataToServer(blob, startTime) {
         console.log(data);
         statusDiv.innerText = "Status: Complete";
         loadAndPlayMP3(`${startTime}`.substring(0,10) + '.mp3');
+        loadAndDisplayChatLog('joanne.json');
+        document.getElementById('startButton').disabled = false
     })
     .catch(error => {
         console.error("Error sending data:", error);
@@ -157,19 +231,44 @@ function sendDataToServer(blob, startTime) {
     });
 }
 
-
-// Define the function to handle MP3 loading
 function loadAndPlayMP3(mp3_filename) {
     let hasPlayed = false;
     let attempts = 0;
+    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let analyser = audioContext.createAnalyser();
 
     // Function to update UI after playback
     function updateUIAfterPlayback() {
-        // Update UI here, for example:
+        // Update UI here
         document.getElementById('status').textContent = 'Playback finished';
-        console.log('Playback finished')
-        startRecording()
+        console.log('Playback finished');
+        startRecording();
     }
+
+    const drawVUMeter = () => {
+        requestAnimationFrame(drawVUMeter); // Continuously loop
+        let dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(dataArray); // Get frequency data
+
+        // Use the frequency data to draw VU meter on canvas
+        let canvas = document.getElementById('vuMeter');
+        let ctx = canvas.getContext('2d');
+
+        // Clear previous drawing
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Example drawing code for VU meter (customize as needed)
+        let barWidth = (canvas.width / dataArray.length);
+        let barHeight;
+        let x = 0;
+        for(let i = 0; i < dataArray.length; i++) {
+            barHeight = dataArray[i]/2;
+            ctx.fillStyle = 'rgb(' + (barHeight+100) + ',50,50)';
+            ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+            x += barWidth + 1;
+        }
+    };
 
     const tryFetch = () => {
         fetch(mp3_filename)
@@ -178,12 +277,16 @@ function loadAndPlayMP3(mp3_filename) {
                 throw new Error('File not found');
             })
             .then(blob => {
-                let audio = new Audio(URL.createObjectURL(blob));
-                audio.play();
-                hasPlayed = true;
+                let audioSrc = audioContext.createMediaElementSource(new Audio(URL.createObjectURL(blob)));
+                audioSrc.connect(analyser);
+                analyser.connect(audioContext.destination);
 
-                // Add an event listener for when the audio finishes playing
-                audio.addEventListener('ended', updateUIAfterPlayback);
+                audioSrc.mediaElement.play();
+                hasPlayed = true;
+                drawVUMeter();
+
+                // Add event listener for when the audio finishes playing
+                audioSrc.mediaElement.addEventListener('ended', updateUIAfterPlayback);
             })
             .catch(error => {
                 console.error('Fetch failed', error);
@@ -203,6 +306,43 @@ function loadAndPlayMP3(mp3_filename) {
     }, RESPONSE_DELAY);
 }
 
+async function loadAndDisplayChatLog(message_log_filename) {
+    try {
+        // Fetch the chat log from the server
+        const response = await fetch(message_log_filename);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status} (${message_log_filename})`);
+        }
+
+        // Parse the JSON data
+        const chatLog = await response.json();
+
+        // Format the chat log into HTML
+        let formattedHtml = '';
+        chatLog.forEach(entry => {
+            switch (entry.role) {
+                case 'system':
+                    // formattedHtml += `<div class="message system-message">${entry.content}</div>`;
+                    break;
+                case 'user':
+                    formattedHtml += `<div class="message user-message">${entry.content}</div>`;
+                    break;
+                case 'assistant':
+                    formattedHtml += `<div class="message assistant-message">${entry.content}</div>`;
+                    break;
+                default:
+                    formattedHtml += `<div class="message">${entry.content}</div>`;
+            }
+        });
+
+        // Replace the contents of the 'messages' div with the formatted HTML
+        document.getElementById('messages').innerHTML = formattedHtml;
+        updateScroll();
+
+    } catch (error) {
+        console.error('Failed to load chat log:', error);
+    }
+}
 
 </script>
 </body>
