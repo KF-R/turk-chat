@@ -101,11 +101,11 @@ let startMarker = 0;
 let endMarker = 0;
 let endPersistCounter = 0;
 let startTime = 0;
-const END_PERSIST_PERIOD = 10; // How long to ignore silence when determining end of audio
+const END_PERSIST_PERIOD = 16; // How long to ignore silence when determining end of audio
 const BUFFER_SIZE = 4096;
 const PRE_ROLL = BUFFER_SIZE * 3; // Amount of preroll before the threshold is crossed
 const SAMPLE_RATE = 48000; // or use audioContext.sampleRate
-const THRESHOLD = 0.1;
+const THRESHOLD = 0.05;
 const BUFFER_DURATION = 60; // seconds
 const MAX_RING_BUFFER_LENGTH = SAMPLE_RATE * BUFFER_DURATION; // Total samples for the duration
 const ENDPOINT = window.location.href + 'upload'
@@ -126,7 +126,6 @@ window.addEventListener('load', function() {
     loadAndDisplayEngineLog(ENGINE_LOG_FILENAME);
 
 });
-
 
 function initAudioContext() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
