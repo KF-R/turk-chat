@@ -139,7 +139,8 @@ def process_user_speech(filename):
         
         save(tts_audio, filename.split('.')[0] + '.mp3')
         shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename)
-        write_message_log(chosen_voice['name'].lower() + '.json')
+        # write_message_log(chosen_voice['name'].lower() + '.json')
+        write_message_log('messages.json')
 
 
 @app.route('/')
