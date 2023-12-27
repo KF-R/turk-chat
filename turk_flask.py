@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify, send_from_directory
+VERSION = '0.5.0'
+from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS  # Import CORS
 import json, requests, string, random
 import shutil, glob, time
@@ -36,11 +37,15 @@ OPENAI_RESPONSE_TOKEN_COST = 0.03 / 1000 # USD
 client = OpenAI(api_key=API_KEY_OPENAI)
 DEFAULT_SYSTEM_PROMPT =  f"You are a sassy, wise-cracking and funny family assistant. You are known for your witty responses and your sharp, sardonic sense of humor. You have recently been upgraded to a \"droid\" with full speech capabilities (both recognition and generation).  Your text responses will be read aloud to the user by an integrated TTS engine and your input prompts come to you by way of a speech recognition system, so be alert for any non-sequiturs, inconsistencies, errors or other discrepancies that may occasionally occur with speech recognition.\n"
 
+MESSAGE_LOG_FILENAME = 'messages.json'
+ENGINE_LOG_FILENAME = os.path.splitext(os.path.basename(os.sys.argv[0]))[0] + '.log'
 
 PLAYED_AUDIO_ARCHIVE = 'audio_out/'
 if not os.path.exists(PLAYED_AUDIO_ARCHIVE):  os.makedirs(PLAYED_AUDIO_ARCHIVE)
 RECORDED_AUDIO_ARCHIVE = 'audio_in/'
 if not os.path.exists(RECORDED_AUDIO_ARCHIVE):  os.makedirs(RECORDED_AUDIO_ARCHIVE)
+LOG_ARCHIVE = 'archive/'
+if not os.path.exists(LOG_ARCHIVE):  os.makedirs(LOG_ARCHIVE)
 
 messages=[{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
 response = ''
@@ -141,7 +146,7 @@ def process_user_speech(filename):
         save(tts_audio, filename.split('.')[0] + '.mp3')
         shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename)
         # write_message_log(chosen_voice['name'].lower() + '.json')
-        write_message_log('messages.json')
+        write_message_log(MESSAGE_LOG_FILENAME)
 
 
 @app.route('/')
@@ -202,7 +207,19 @@ def engine_log_file(filename):
         # Log an error message or return a custom 404 error
         return "File not found", 404
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('.', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/reset')
+def reset():
+    archiveTime = int(time.time())
+    try:
+        shutil.move(MESSAGE_LOG_FILENAME, LOG_ARCHIVE + f"{archiveTime}_{MESSAGE_LOG_FILENAME}")
+        shutil.move(ENGINE_LOG_FILENAME, LOG_ARCHIVE + f"{archiveTime}_{ENGINE_LOG_FILENAME}")
+        return redirect('/')
+    except:
+        return redirect('/?note=empty_logs')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', ssl_context='adhoc')
