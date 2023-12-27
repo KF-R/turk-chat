@@ -37,7 +37,11 @@ client = OpenAI(api_key=API_KEY_OPENAI)
 DEFAULT_SYSTEM_PROMPT =  f"You are a sassy, wise-cracking and funny family assistant. You are known for your witty responses and your sharp, sardonic sense of humor. You have recently been upgraded to a \"droid\" with full speech capabilities (both recognition and generation).  Your text responses will be read aloud to the user by an integrated TTS engine and your input prompts come to you by way of a speech recognition system, so be alert for any non-sequiturs, inconsistencies, errors or other discrepancies that may occasionally occur with speech recognition.\n"
 
 
+PLAYED_AUDIO_ARCHIVE = 'audio_out/'
+if not os.path.exists(PLAYED_AUDIO_ARCHIVE):  os.makedirs(PLAYED_AUDIO_ARCHIVE)
 RECORDED_AUDIO_ARCHIVE = 'audio_in/'
+if not os.path.exists(RECORDED_AUDIO_ARCHIVE):  os.makedirs(RECORDED_AUDIO_ARCHIVE)
+
 messages=[{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
 response = ''
 
@@ -78,7 +82,6 @@ def message_filter(msg: str = ''):
         r = cleaned_text + f"\n\nYou'll find the {len(codeblocks) if len(codeblocks) > 1 else ''} code block{'s' if len(codeblocks) > 1 else ''} that I've extracted in the sandbox."
     return r
 
-
 def write_message_log(filename):
     with open(filename, 'w') as json_file:
         json.dump(messages, json_file, indent=4)
@@ -116,6 +119,7 @@ def process_user_speech(filename):
 
         prompt_cost, response_cost = prompt_tokens * OPENAI_PROMPT_TOKEN_COST, response_tokens * OPENAI_RESPONSE_TOKEN_COST
         print_log(f"Response cost:  ${(prompt_cost):.4f} + ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}")
+        print_log(f"Conversation token level: {total_tokens:,} / {OPENAI_MAX_TOKENS:,}  ({( total_tokens / OPENAI_MAX_TOKENS * 100):.2f}%)")
 
         # Generate TTS conversion of AI response
         if not chosen_voice: 
@@ -136,7 +140,6 @@ def process_user_speech(filename):
         save(tts_audio, filename.split('.')[0] + '.mp3')
         shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename)
         write_message_log(chosen_voice['name'].lower() + '.json')
-
 
 
 @app.route('/')
@@ -172,8 +175,8 @@ def response_file(filename):
     try:
         secure_filename_str = secure_filename(f"{filename}.mp3")
 
-        shutil.move(secure_filename_str, RECORDED_AUDIO_ARCHIVE + secure_filename_str)
-        return send_from_directory(RECORDED_AUDIO_ARCHIVE, secure_filename_str)
+        shutil.move(secure_filename_str, PLAYED_AUDIO_ARCHIVE + secure_filename_str)
+        return send_from_directory(PLAYED_AUDIO_ARCHIVE, secure_filename_str)
 
     except FileNotFoundError:
         # Log an error message or return a custom 404 error
@@ -187,6 +190,17 @@ def message_log_file(filename):
     except FileNotFoundError:
         # Log an error message or return a custom 404 error
         return "File not found", 404
+
+@app.route('/<filename>.log')
+def engine_log_file(filename):
+    try:
+        secure_filename_str = secure_filename(f"{filename}.log")
+        return send_from_directory('.', secure_filename_str)
+    except FileNotFoundError:
+        # Log an error message or return a custom 404 error
+        return "File not found", 404
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', ssl_context='adhoc')
