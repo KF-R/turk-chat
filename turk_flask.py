@@ -22,7 +22,7 @@ set_api_key(API_KEY_ELEVENLABS)
 SELECTED_VOICE_NAME = 'joanne'
 
 # Whisper API transcription setup
-LOCAL_SR = True
+LOCAL_SR = False
 LOCAL_WHISPER_MODEL_NAME = 'base.en' # tiny.en,base.en,small.en,medium.en,large
 local_whisper = whisper.load_model(LOCAL_WHISPER_MODEL_NAME)
 
@@ -80,6 +80,7 @@ def message_filter(msg: str = ''):
     # print_log(f"Count: {len(codeblocks)} \n\n {'*'*80} \n {cleaned_text}")
     if len(codeblocks)>0:
         r = cleaned_text + f"\n\nYou'll find the {len(codeblocks) if len(codeblocks) > 1 else ''} code block{'s' if len(codeblocks) > 1 else ''} that I've extracted in the sandbox."
+    r = r.replace('=',' equals ')
     return r
 
 def write_message_log(filename):
@@ -96,20 +97,20 @@ def process_user_speech(filename):
     # Obtain transcript of user speech
     if LOCAL_SR:
         transcript = local_whisper.transcribe(filename, language = 'en')
+        transcript_text = transcript['text']
     else:
         audio_file = open(filename, "rb")
-        transcript = client.audio.transcriptions.create(
+        transcript_text = client.audio.transcriptions.create(
             model=WHISPER_API_MODEL_NAME,
             file=audio_file,
-            langague = 'en', 
             response_format="text" )
 
     # chance_of_false_positive = transcript['segments'][0]['no_speech_prob']
 
     # Obtain AI response to tanscribed user speech
-    if not empty_string(transcript['text']):
-        print_log(f"Heard: {transcript['text']}")
-        messages.append({'role': 'user', 'content': transcript['text']})
+    if not empty_string(transcript_text):
+        print_log(f"Heard: {transcript_text}")
+        messages.append({'role': 'user', 'content': transcript_text})
 
         response_object = client.chat.completions.create(model = OPENAI_MODEL_NAME, messages=messages)
         response_text = response_object.choices[0].message.content
