@@ -6,6 +6,7 @@
 <style>
     body {
         background-color: darkgrey;
+        width: 440px;
     }
     #status {
         padding: 10px;
@@ -68,16 +69,25 @@
     padding: 10px;
   }
 
+  #controls {
+    padding: 10px;
+  }
+
 </style>
 </head>
+
 <body>
-<h1>Web Converse</h1>
+<div id="controls" align="center">
 <button id="startButton">Start Listening</button>
+</div>
 <hr //>
 <div id="status" class="stopped">Status: Stopped</div>
 <canvas id="vuMeter"></canvas>
 <hr //>
 <div id="messages" class="scrollable">&nbsp;</div>
+<hr //>
+<div id="log">&nbsp;</div>
+
 <script>
 // Set up necessary variables and constants
 let isRecording = false;
@@ -107,20 +117,9 @@ document.getElementById('startButton').addEventListener('click', () => {
     } else {
         // audioContext.resume();
         stopRecording()
-        document.getElementById('startButton').innerText = 'Resume Listening'
     }
 });
 loadAndDisplayChatLog('joanne.json');
-
-document.addEventListener("DOMContentLoaded", function() {
-  var element = document.getElementById("scrollableDiv");
-  element.scrollTop = element.scrollHeight;
-});
-
-function updateScroll(){
-    var element = document.getElementById("content");
-    element.scrollTop = element.scrollHeight;
-}
 
 function initializeMedia() {
     navigator.mediaDevices.getUserMedia({audio: true})
@@ -153,7 +152,7 @@ function startRecording() {
     statusDiv.innerText = "Status: Listening";
     statusDiv.classList.remove("stopped");
     statusDiv.classList.add("listening");
-    document.getElementById('startButton').innerText = 'Stop Listening'
+    document.getElementById('startButton').visible = false;
 }
 
 function stopRecording() {
@@ -204,7 +203,6 @@ function handleStop() {
     statusDiv.innerText = "Status: Processing...";
     statusDiv.classList.remove("recording");
     statusDiv.classList.add("stopped");
-    document.getElementById('startButton').disabled = true
 }
 
 function sendDataToServer(blob, startTime) {
@@ -223,7 +221,6 @@ function sendDataToServer(blob, startTime) {
         statusDiv.innerText = "Status: Complete";
         loadAndPlayMP3(`${startTime}`.substring(0,10) + '.mp3');
         loadAndDisplayChatLog('joanne.json');
-        document.getElementById('startButton').disabled = false
     })
     .catch(error => {
         console.error("Error sending data:", error);
@@ -337,7 +334,6 @@ async function loadAndDisplayChatLog(message_log_filename) {
 
         // Replace the contents of the 'messages' div with the formatted HTML
         document.getElementById('messages').innerHTML = formattedHtml;
-        updateScroll();
 
     } catch (error) {
         console.error('Failed to load chat log:', error);
@@ -345,5 +341,6 @@ async function loadAndDisplayChatLog(message_log_filename) {
 }
 
 </script>
+
 </body>
 </html>
