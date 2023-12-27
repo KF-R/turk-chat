@@ -80,7 +80,7 @@
     </style>
 </head>
 <body>
-
+    <a href="/reset">RESET</a>
     <div id="controls" align="center">
     <button id="startButton" onclick="startRecording()">Start Listening</button>
     </div>
@@ -108,7 +108,7 @@ const SAMPLE_RATE = 48000; // or use audioContext.sampleRate
 const THRESHOLD = 0.05;
 const BUFFER_DURATION = 60; // seconds
 const MAX_RING_BUFFER_LENGTH = SAMPLE_RATE * BUFFER_DURATION; // Total samples for the duration
-const ENDPOINT = window.location.href + 'upload'
+const ENDPOINT = window.location.href.split('?')[0] + 'upload'
 const statusDiv = document.getElementById('status');
 
 const RETRY_TIMEOUT = 1000 // Keep checking for responses at this frequency if first check failed
@@ -351,7 +351,8 @@ async function loadAndDisplayChatLog(message_log_filename) {
     try {
         const response = await fetch(message_log_filename);
         if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status} (${message_log_filename})`);
+            console.warn('Failed to fetch chat log:');
+            return;
         }
 
         const chatLog = await response.json();
@@ -384,7 +385,8 @@ async function loadAndDisplayEngineLog(engine_log_filename) {
     try {
         const response = await fetch(engine_log_filename);
         if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status} (${engine_log_filename})`);
+            console.warn('Failed to fetch engine log:');
+            return;
         }
 
         const engineLog = await response.text()
