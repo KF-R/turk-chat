@@ -1,0 +1,6 @@
+# Fill in these values and put this file in your home directory 
+# (or put them into the script via constants, environment variables etc.; you do you)
+# Don't forget to remove the .example extension
+
+API_KEY_OPENAI = '<insert_your_OpenAI_API_key_here>'
+API_KEY_ELEVENLABS = '<insert_your_ElevenLabs_API_key_here>'
