@@ -4,45 +4,47 @@
     <meta charset="UTF-8">
     <title>turk-chat-web</title>
     <style>
-        body {
-            background-color: darkgrey;
-            width: 440px;
-        }
-        #status {
-            padding: 10px;
-            color: white;
-            width: 420px;
-        }
-        .listening {
-            background-color: blue;
-        }
-        .recording {
-            background-color: red;
-        }
-        .stopped {
-            background-color: grey;
-        }
-        
-        /* button styling */
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            color: white;
-            background-color: #007bff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+    body {
+        background-color: darkgrey;
+        width: 500px;
+    }
+    #status {
+        padding: 10px;
+        color: white;
+        width: 480px;
+    }
+    .listening {
+        background-color: blue;
+    }
+    .recording {
+        background-color: red;
+    }
+    .stopped {
+        background-color: grey;
+    }
     
-        button:hover {
-            background-color: #0056b3;
-        }
-    
-        .message {
+    /* button styling */
+    button {
+        padding: 8px 16px;
+        font-size: 12px;
+        color: white;
+        background-color: #007bff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+
+    .message {
+        margin-left: 10px;
         margin-bottom: 10px;
         padding: 5px;
         border-radius: 5px;
-        }
+        width: 90%;
+    }
     
     .system-message {
         background-color: lightgrey;
@@ -57,9 +59,14 @@
         background-color: lightgreen;
         }
     
+    #resetButton {
+        background-color: darkred;        
+    }
+
     #messages {
         background-color: grey;    
-        width: 420px;
+        width: 480px;
+        font-size: small;
         }
     
     #engine-log {
@@ -67,22 +74,43 @@
     }
     
     .scrollable {
-        max-height: 300px; /* Adjust height as needed */
+        max-height: 420px; 
         overflow-y: scroll;
-        border: 1px solid #ccc; /* Just for visibility */
+        border: 1px solid #ccc; 
         padding: 10px;
-      }
+    }
     
-      #controls {
-        padding: 10px;
-      }
+    #controls {
+        padding: 6px;
+        font-size: small;
+    }
+
+    canvas {
+        width:500px;
+        background-color: #222;
+    }
     
+    #nameDropdown {
+        padding: 4px;  
+        margin: 2px 10px; 
+        border: 2px solid #000; 
+        border-radius: 4px; 
+        background-color: white; 
+        cursor: pointer;
+    }
+
+    #nameDropdown:hover {
+        border-color: white; 
+    }
+
     </style>
 </head>
 <body>
-    <a href="/reset">RESET</a>
     <div id="controls" align="center">
-    <button id="startButton" onclick="startRecording()">Start Listening</button>
+    Voice: <select id="nameDropdown"></select>
+    <a href="/reset"><button id="resetButton">Reset</button></a>
+    <button id="startButton" style="visibility: visible;" onclick="startRecording()">Start Listening</button>
+    <a href="/"><button id="stopButton" style="visibility: hidden;">Stop Listening</button></a>
     </div>
     <div id="status" class="stopped">Status: Stopped</div>
     <canvas id="vuMeter"></canvas>
@@ -91,6 +119,7 @@
 
 
 <script>
+// v0.5.1
 let audioContext;
 let isRecording = false;
 let isProcessing = false; // Flag to indicate audio processing is ongoing
@@ -105,7 +134,7 @@ const END_PERSIST_PERIOD = 16; // How long to ignore silence when determining en
 const BUFFER_SIZE = 4096;
 const PRE_ROLL = BUFFER_SIZE * 3; // Amount of preroll before the threshold is crossed
 const SAMPLE_RATE = 48000; // or use audioContext.sampleRate
-const THRESHOLD = 0.05;
+const THRESHOLD = 0.05; // Microphone volume threshold for speech detection
 const BUFFER_DURATION = 60; // seconds
 const MAX_RING_BUFFER_LENGTH = SAMPLE_RATE * BUFFER_DURATION; // Total samples for the duration
 const ENDPOINT = window.location.href.split('?')[0] + 'upload'
@@ -122,6 +151,7 @@ let manuallyStopped = false
 
 window.addEventListener('load', function() {
 
+    fetchVoiceList();
     loadAndDisplayChatLog(MESSAGE_LOG_FILENAME);
     loadAndDisplayEngineLog(ENGINE_LOG_FILENAME);
 
@@ -146,7 +176,10 @@ function startRecording() {
             scriptProcessor.onaudioprocess = processAudio;
             updateStatus("Listening...");
 
-            document.getElementById('startButton').style.display = 'none';
+            // document.getElementById('startButton').style.display = 'none';
+            document.getElementById('startButton').style.visibility = 'hidden';
+            document.getElementById('stopButton').style.visibility = 'visible';
+
 
         }).catch(err => {
             console.error("Error accessing microphone", err);
@@ -230,10 +263,13 @@ function convertToWav(audioBuffer, label) {
     }
 
     let blob = new Blob([view], { type: 'audio/wav' });
-
+    
     let formData = new FormData();
     formData.append("audio", blob, label + '.wav');
-    
+
+    let selectedName = document.getElementById('nameDropdown').value;
+    formData.append("name", selectedName);    
+
     fetch(ENDPOINT, {
         method: 'POST',
         body: formData
@@ -299,7 +335,7 @@ function loadAndPlayMP3(mp3_filename) {
             let x = 0;
             for(let i = 0; i < dataArray.length; i++) {
                 barHeight = dataArray[i]/2;
-                ctx.fillStyle = 'rgb(' + (barHeight+100) + ',50,50)';
+                ctx.fillStyle = 'rgb(' + (barHeight+150) + ',50,50)';
                 ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
 
                 x += barWidth + 1;
@@ -385,7 +421,7 @@ async function loadAndDisplayEngineLog(engine_log_filename) {
     try {
         const response = await fetch(engine_log_filename);
         if (!response.ok) {
-            console.warn('Failed to fetch engine log:');
+            console.warn('Failed to fetch engine log.');
             return;
         }
 
@@ -400,6 +436,32 @@ async function loadAndDisplayEngineLog(engine_log_filename) {
     } catch (error) {
         console.error('Failed to load engine log:', error);
     }    
+}
+
+async function fetchVoiceList() {
+    try {
+        const response = await fetch('voices');
+        if (!response.ok) {
+            console.warn('Failed to fetch voice list.');
+            return;
+        }
+
+        const voiceList = await response.text();
+        voices = JSON.parse(voiceList);
+        voices.unshift('');
+        
+        const nameDropdown = document.getElementById('nameDropdown');
+
+        for (const name of voices) {
+            const option = document.createElement('option');
+            option.value = name;  // You can set the value if needed
+            option.text = name;   // The text to display in the dropdown
+            nameDropdown.appendChild(option);
+        }
+
+    } catch (error) {
+        console.error('Failed to load engine log:', error);
+    }      
 }
 
 </script>
