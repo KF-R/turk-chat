@@ -1,4 +1,4 @@
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS  # Import CORS
 import json, requests, string, random
@@ -21,15 +21,16 @@ ELEVENLABS_VOICE_LIST = json.loads(requests.request("GET", ELEVENLABS_API_URL, h
 chosen_voice = None
 set_api_key(API_KEY_ELEVENLABS)
 SELECTED_VOICE_NAME = 'joanne'
+DEFAULT_VOICE_NAME = 'joanne'
 
-# Whisper API transcription setup
+# Whisper transcription setup
 LOCAL_SR = False
 LOCAL_WHISPER_MODEL_NAME = 'base.en' # tiny.en,base.en,small.en,medium.en,large
 local_whisper = whisper.load_model(LOCAL_WHISPER_MODEL_NAME)
 
 WHISPER_API_MODEL_NAME = 'whisper-1'
 
-# Non-whisper OpenAI API setup
+# OpenAI API setup
 OPENAI_MODEL_NAME = 'gpt-4-1106-preview' # gpt-4-1106-vision-preview
 OPENAI_MAX_TOKENS = 128000
 OPENAI_PROMPT_TOKEN_COST   = 0.01 / 1000 # USD
@@ -46,8 +47,10 @@ RECORDED_AUDIO_ARCHIVE = 'audio_in/'
 if not os.path.exists(RECORDED_AUDIO_ARCHIVE):  os.makedirs(RECORDED_AUDIO_ARCHIVE)
 LOG_ARCHIVE = 'archive/'
 if not os.path.exists(LOG_ARCHIVE):  os.makedirs(LOG_ARCHIVE)
+SANDBOX_DIR = 'sandbox/'
+if not os.path.exists(SANDBOX_DIR):  os.makedirs(SANDBOX_DIR)
 
-messages=[{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
+messages=[]
 response = ''
 
 app = Flask(__name__)
@@ -88,12 +91,21 @@ def message_filter(msg: str = ''):
     r = r.replace('=',' equals ')
     return r
 
+def read_message_log(filename):
+    try:
+        with open(filename, 'r') as json_file:
+            print_log('Message history loaded.')
+            return json.load(json_file)
+    except:
+        print_log('No message history; system prompt has been re-initialised.')
+        return [{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
+        
 def write_message_log(filename):
     with open(filename, 'w') as json_file:
         json.dump(messages, json_file, indent=4)
 
 def process_user_speech(filename):
-    global transcript, messages, chosen_voice
+    global transcript, messages
 
     def empty_string(s):
         stripped = s.replace(chr(46),'').strip()
@@ -102,13 +114,13 @@ def process_user_speech(filename):
     # Obtain transcript of user speech
     if LOCAL_SR:
         transcript = local_whisper.transcribe(filename, language = 'en')
-        transcript_text = transcript['text']
+        transcript_text = transcript['text'].rstrip()
     else:
         audio_file = open(filename, "rb")
-        transcript_text = client.audio.transcriptions.create(
+        transcript_text = str(client.audio.transcriptions.create(
             model=WHISPER_API_MODEL_NAME,
             file=audio_file,
-            response_format="text" )
+            response_format="text" )).rstrip()
 
     # chance_of_false_positive = transcript['segments'][0]['no_speech_prob']
 
@@ -124,15 +136,15 @@ def process_user_speech(filename):
         prompt_tokens, response_tokens, total_tokens = response_object.usage.prompt_tokens, response_object.usage.completion_tokens, response_object.usage.total_tokens
 
         prompt_cost, response_cost = prompt_tokens * OPENAI_PROMPT_TOKEN_COST, response_tokens * OPENAI_RESPONSE_TOKEN_COST
-        print_log(f"Response cost:  ${(prompt_cost):.4f} + ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}")
-        print_log(f"Conversation token level: {total_tokens:,} / {OPENAI_MAX_TOKENS:,}  ({( total_tokens / OPENAI_MAX_TOKENS * 100):.2f}%)")
+        response_cost = f"Response cost:  ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
+        token_level = f"Token level: {total_tokens:,} / {OPENAI_MAX_TOKENS:,}  ({( total_tokens / OPENAI_MAX_TOKENS * 100):.2f}%)"
+        print_log(f"{token_level} [{response_cost}]")
 
         # Generate TTS conversion of AI response
-        if not chosen_voice: 
-            for voice in ELEVENLABS_VOICE_LIST:
-                if SELECTED_VOICE_NAME.upper() in voice['name'].upper(): chosen_voice = voice
+        for voice in ELEVENLABS_VOICE_LIST:
+            if SELECTED_VOICE_NAME.upper() in voice['name'].upper(): chosen_voice = voice
             
-            if not chosen_voice: chosen_voice = random.choice(ELEVENLABS_VOICE_LIST)
+        if not chosen_voice: chosen_voice = random.choice(ELEVENLABS_VOICE_LIST)
 
         print_log(f"{chosen_voice['name'].capitalize()} responded with {response_tokens} tokens.")
 
@@ -140,35 +152,39 @@ def process_user_speech(filename):
             text = convert_complete_number_string(message_filter(response_text)),
             voice = chosen_voice['name'],
             model = "eleven_turbo_v2"
-            # model = "eleven_monolingual_v1",
             )
         
         save(tts_audio, filename.split('.')[0] + '.mp3')
         shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename)
-        # write_message_log(chosen_voice['name'].lower() + '.json')
         write_message_log(MESSAGE_LOG_FILENAME)
 
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')  # Assuming the HTML is named index.html and is in the same directory as the script
+    return send_from_directory('.', 'index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    print('Audio submission received!')
+    global SELECTED_VOICE_NAME
+    print_log('Audio submission received.')
     if 'audio' in request.files:
         audio = request.files['audio']
         original_filename = audio.filename
 
-        # Separate the extension and truncate the filename
         base_name, ext = os.path.splitext(original_filename)
-        truncated_name = base_name[:10]  # Keep only the first 10 characters
+        truncated_name = base_name[:10]  # Keep only the first 10 characters of the filename prefix
 
-        # Reassemble the filename with its extension
         safe_filename = f"{truncated_name}{ext}"
         
-        # Save the file (consider security and file handling best practices)
         audio.save(safe_filename)
+
+        desired_voice_name = request.form.get('name')
+        if desired_voice_name:
+            for voice in ELEVENLABS_VOICE_LIST:
+                if desired_voice_name.upper() in voice['name'].upper(): 
+                    SELECTED_VOICE_NAME = voice['name']
+
+        else: SELECTED_VOICE_NAME = DEFAULT_VOICE_NAME    
 
         process_user_speech(safe_filename)
 
@@ -213,14 +229,22 @@ def favicon():
 
 @app.route('/reset')
 def reset():
+    global messages
     archiveTime = int(time.time())
     try:
         shutil.move(MESSAGE_LOG_FILENAME, LOG_ARCHIVE + f"{archiveTime}_{MESSAGE_LOG_FILENAME}")
         shutil.move(ENGINE_LOG_FILENAME, LOG_ARCHIVE + f"{archiveTime}_{ENGINE_LOG_FILENAME}")
+        messages=[{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
         return redirect('/')
     except:
         return redirect('/?note=empty_logs')
 
+@app.route('/voices')
+def voice_list():
+    return [d['name'] for d in ELEVENLABS_VOICE_LIST]
+
 if __name__ == '__main__':
+    print_log(f"v{VERSION}: Initialising...")
+    messages = read_message_log(MESSAGE_LOG_FILENAME)
     app.run(debug=True, host='0.0.0.0', ssl_context='adhoc')
 
