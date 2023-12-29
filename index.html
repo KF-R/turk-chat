@@ -119,7 +119,7 @@
 
 
 <script>
-// v0.5.1
+// v0.5.2
 let audioContext;
 let isRecording = false;
 let isProcessing = false; // Flag to indicate audio processing is ongoing
@@ -142,6 +142,7 @@ const statusDiv = document.getElementById('status');
 
 const RETRY_TIMEOUT = 1000 // Keep checking for responses at this frequency if first check failed
 const RESPONSE_DELAY = 5000 // How long to wait before checking for a response after submission
+const RESPONSE_FETCH_RETRY_LIMIT = 120 // How many times to check for a response before giving up.
 
 const MESSAGE_LOG_FILENAME = 'messages.json'
 const ENGINE_LOG_FILENAME = 'turk_flask.log'
@@ -240,11 +241,17 @@ function convertToWav(audioBuffer, label) {
     let buffer = new ArrayBuffer(44 + numSamples * 2 * numChannels);
     let view = new DataView(buffer);
 
+    function writeDataString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    }
+
     // Writing the WAV container
-    writeString(view, 0, 'RIFF');
+    writeDataString(view, 0, 'RIFF');
     view.setUint32(4, 36 + numSamples * 2, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
+    writeDataString(view, 8, 'WAVE');
+    writeDataString(view, 12, 'fmt ');
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
     view.setUint16(22, numChannels, true);
@@ -252,7 +259,7 @@ function convertToWav(audioBuffer, label) {
     view.setUint32(28, SAMPLE_RATE * numChannels * 2, true);
     view.setUint16(32, numChannels * 2, true);
     view.setUint16(34, 16, true);
-    writeString(view, 36, 'data');
+    writeDataString(view, 36, 'data');
     view.setUint32(40, numSamples * 2, true);
 
     let index = 44;
@@ -297,15 +304,22 @@ function convertToWav(audioBuffer, label) {
     });
 }
 
-function writeString(view, offset, string) {
-    for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-    }
-}
-
 function updateStatus(message) {
     statusDiv.innerText = message;
     statusDiv.style.backgroundColor = isRecording ? "green" : "grey";
+}
+
+function formatReportString(input) {
+    const parts = input.split('|'); // Assumes token and cost reports are on the same line, separated by a pipe
+    
+    if(parts.length === 2) {
+        // Return the HTML string with left and right aligned spans
+        console.warn(parts.length);
+        return `<span style="float: left;">${parts[0].trim()}</span><span style="float: right;">${parts[1].trim()}</span>`;
+    } else {
+        // Return the original input if it doesn't contain a pipe character or is not split into two parts
+        return input;
+    }
 }
 
 function loadAndPlayMP3(mp3_filename) {
@@ -372,7 +386,7 @@ function loadAndPlayMP3(mp3_filename) {
         setTimeout(() => {
             tryFetch();
             let interval = setInterval(() => {
-                if(!hasPlayed && attempts < 120) {
+                if(!hasPlayed && attempts < RESPONSE_FETCH_RETRY_LIMIT) {
                     tryFetch();
                     attempts++;
                 } else {
@@ -381,6 +395,18 @@ function loadAndPlayMP3(mp3_filename) {
             }, RETRY_TIMEOUT);
         }, RESPONSE_DELAY);
     });
+}
+
+function htmlCodeBlock(text) {
+    // Converts triple back-tick delimiter pairs to html
+    const regex = /```(.*?)```/gs;
+
+    // Replace the matched pairs with <pre> and </pre> tags
+    const convertedText = text.replace(regex, function(match, group1) {
+        return `<pre>${group1}</pre>`;
+    });
+
+    return convertedText;
 }
 
 async function loadAndDisplayChatLog(message_log_filename) {
@@ -403,7 +429,11 @@ async function loadAndDisplayChatLog(message_log_filename) {
                     formattedHtml += `<div class="message user-message">${entry.content}</div>`;
                     break;
                 case 'assistant':
-                    formattedHtml += `<div class="message assistant-message">${entry.content}</div>`;
+                    if (String(entry.content).includes("```")) {
+                        formattedHtml += `<div class="message assistant-message">${htmlCodeBlock(entry.content)}</div>`;
+                    } else {
+                        formattedHtml += `<div class="message assistant-message">${entry.content}</div>`;
+                    }
                     break;
                 default:
                     formattedHtml += `<div class="message">${entry.content}</div>`;
@@ -413,7 +443,7 @@ async function loadAndDisplayChatLog(message_log_filename) {
         document.getElementById('messages').innerHTML = formattedHtml;
 
     } catch (error) {
-        console.error('Failed to load chat log:', error);
+        console.error('Failed to parse chat log:', error);
     }
 }
 
@@ -429,9 +459,14 @@ async function loadAndDisplayEngineLog(engine_log_filename) {
 
         var lines = engineLog.split('\n').slice(-ENGINE_LOG_LINES_LIMIT);
         lines.reverse();
+
+        for (let i = 0; i < lines.length; i++) {
+            lines[i] = formatReportString(lines[i]) + '<br/>\n'
+        }
+
         var reversedOrderLog = lines.join('\n');
 
-        document.getElementById('engine-log').innerText = reversedOrderLog;
+        document.getElementById('engine-log').innerHTML= reversedOrderLog;
 
     } catch (error) {
         console.error('Failed to load engine log:', error);
@@ -454,13 +489,13 @@ async function fetchVoiceList() {
 
         for (const name of voices) {
             const option = document.createElement('option');
-            option.value = name;  // You can set the value if needed
-            option.text = name;   // The text to display in the dropdown
+            option.value = name;
+            option.text = name;
             nameDropdown.appendChild(option);
         }
 
     } catch (error) {
-        console.error('Failed to fetch TTS voice list.', error);
+        console.error('Failed to parse TTS voice list.', error);
     }      
 }
 
