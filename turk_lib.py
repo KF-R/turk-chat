@@ -1,4 +1,13 @@
 import sys, time, re
+from googlesearch import search
+import wikipediaapi
+import requests
+CONTACT_EMAIL = 'your_email_here@example.com'
+USER_AGENT = f"turk_lib.py/0.5 ({CONTACT_EMAIL})"
+wiki_wiki = wikipediaapi.Wikipedia(
+    language = 'en',
+    extract_format = wikipediaapi.ExtractFormat.WIKI,
+    user_agent = USER_AGENT )
 
 def print_log(log_string = '',log_to_file=True, noStdOut = True):
     LOG_FILENAME = sys.argv[0].split('.')[0] + '.log'
@@ -8,10 +17,7 @@ def print_log(log_string = '',log_to_file=True, noStdOut = True):
 
     if(log_to_file):
         with open(LOG_FILENAME, "a") as file:
-            file.write(f"[ {timestamp} ] {log_string}\n")
-            
-
-import re
+            file.write(f"[ {timestamp} ] {log_string}\n")   
 
 # Precomputed lists
 ONES = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
@@ -83,3 +89,39 @@ def convert_complete_number_string(number_string: str) -> str:
         return number_to_words(number_value)
 
     return re.sub(number_regex, replace_match, number_string)
+
+def fetch_google_search_results(query: str, num_results: int = 3) -> list:
+    search_results = search(query, num_results=num_results, advanced=True)
+    plaintext_results = []
+    
+    for result in search_results:
+        title = result.title
+        link = result.url
+        plaintext_results.append(f"### {title}\n- URL: {link}\n- Description: {result.description}\n")
+    
+    return plaintext_results
+
+def fetch_wikipedia_article(article_name: str, only_summary: bool = True):
+
+    wiki_page = wiki_wiki.page(article_name)
+    if not wiki_page.exists(): 
+        return f"No such article [{article_name}]"
+    else:
+        return wiki_page.summary
+
+def wiki_search(search_query: str, number_of_results: int = 3):
+    endpoint_url = 'https://api.wikimedia.org/core/v1/wikipedia/en/search/page'
+    parameters = {'q': search_query, 'limit': number_of_results} if number_of_results > 0 else {'q': search_query}
+    response = requests.get(endpoint_url, headers={'User-Agent': USER_AGENT}, params=parameters)
+    pages = data = response.json()['pages']
+    results = []
+    for page in pages:
+        results.append(page.get('key'))
+
+    return results
+
+if __name__ == '__main__':
+    # print(fetch_wikipedia_article('Python_(programming_language)'))
+    articles = wiki_search('api', 0)
+    for article in articles:
+        print(f"{article.upper()}:\n{fetch_wikipedia_article(article)}\n")
