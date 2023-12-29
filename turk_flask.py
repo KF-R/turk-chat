@@ -1,4 +1,4 @@
-VERSION = '0.5.1'
+VERSION = '0.5.2'
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS  # Import CORS
 import json, requests, string, random
@@ -58,7 +58,6 @@ CORS(app)  # Enable CORS for all routes
 
 def extract_codeblocks(text):
     strings = []
-    # replacement_template = 'snippet_{}.txt'  # template for numbered replacement strings
     replaced_text = text
 
     index = 0
@@ -71,12 +70,12 @@ def extract_codeblocks(text):
             break
         extracted_string = replaced_text[start_index + 3:end_index]
         strings.append(extracted_string)
-        # replacement_string = replacement_template.format(len(strings) - 1)
-        replacement_string = f"see code block {len(strings)-1}"
-        ## filename for snippet is cb_time.time()//60_ (len(strings) - 1)
-        codeblock_filename = f"cb_{int(time.time()//60)}_{(len(strings)-1):02d}.txt"
+        
+        replacement_string = f"\n(See code-block number {(len(strings)):02d})\n"
+        codeblock_filename = f"cb_{int(time.time()//60)}_{(len(strings)):02d}.txt"
         with open(os.path.join(SANDBOX_DIR,f"{codeblock_filename}"), 'w') as snippet:
             snippet.write(extracted_string)
+        
         replaced_text = replaced_text[:start_index] + replacement_string + replaced_text[end_index + 3:]
         index = start_index + len(replacement_string)
 
@@ -85,9 +84,8 @@ def extract_codeblocks(text):
 def message_filter(msg: str = ''):
     r = msg.replace('an AI language model, ','a droid ')
     codeblocks, cleaned_text = extract_codeblocks(r)
-    # print_log(f"Count: {len(codeblocks)} \n\n {'*'*80} \n {cleaned_text}")
     if len(codeblocks)>0:
-        r = cleaned_text + f"\n\nYou'll find the {len(codeblocks) if len(codeblocks) > 1 else ''} code block{'s' if len(codeblocks) > 1 else ''} that I've extracted in the sandbox."
+        r = cleaned_text + f"\n\nYou'll find the {len(codeblocks) if len(codeblocks) > 1 else ''} code block{'s' if len(codeblocks) > 1 else ''} that I've generated in the sandbox."
     r = r.replace('=',' equals ')
     return r
 
@@ -138,7 +136,7 @@ def process_user_speech(filename):
         prompt_cost, response_cost = prompt_tokens * OPENAI_PROMPT_TOKEN_COST, response_tokens * OPENAI_RESPONSE_TOKEN_COST
         response_cost = f"Response cost:  ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
         token_level = f"Token level: {total_tokens:,} / {OPENAI_MAX_TOKENS:,}  ({( total_tokens / OPENAI_MAX_TOKENS * 100):.2f}%)"
-        print_log(f"{token_level} [{response_cost}]")
+        print_log(f"{token_level}  |  {response_cost}")
 
         # Generate TTS conversion of AI response
         for voice in ELEVENLABS_VOICE_LIST:
@@ -225,7 +223,7 @@ def engine_log_file(filename):
 
 @app.route('/favicon.ico')
 def favicon():
-    return send_from_directory('.', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+    return send_from_directory('.', 'favicon.ico', mimetype='image/x-icon')
 
 @app.route('/reset')
 def reset():
@@ -242,6 +240,10 @@ def reset():
 @app.route('/voices')
 def voice_list():
     return [d['name'] for d in ELEVENLABS_VOICE_LIST]
+
+@app.route('/version')
+def get_version():
+    return f"v{VERSION}"
 
 if __name__ == '__main__':
     print_log(f"v{VERSION}: Initialising...")
