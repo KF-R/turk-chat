@@ -1,6 +1,8 @@
 ## turk-chat conversation agent
-<sub>_If you're looking for the async pygame version: https://github.com/KF-R/turk-chat-pygame_</sub>
+<sub>_If you're looking for the older async pygame version: https://github.com/KF-R/turk-chat-pygame_</sub>
 <hr/>
+
+<img src="https://github.com/KF-R/turk-chat/assets/6677966/1896d8b8-7108-4cd2-a76b-edb28bdca90a" width="230px" align="right"/>
 
 ### Features:
 * Ultra-lightweight; only a Python Flask server and a single html file with in-line vanilla JS
