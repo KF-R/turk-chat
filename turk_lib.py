@@ -1,9 +1,12 @@
 import sys, time, re
-from googlesearch import search
 import wikipediaapi
 import requests
+from urllib.parse import urlparse, urlunparse, quote
+from bs4 import BeautifulSoup
+from markdownify import markdownify as md
+
 CONTACT_EMAIL = 'your_email_here@example.com'
-USER_AGENT = f"turk_lib.py/0.5 ({CONTACT_EMAIL})"
+USER_AGENT = f"turk_lib.py/0.6 ({CONTACT_EMAIL})"
 wiki_wiki = wikipediaapi.Wikipedia(
     language = 'en',
     extract_format = wikipediaapi.ExtractFormat.WIKI,
@@ -67,7 +70,6 @@ def convert_to_words(number) -> str:
     return ' '.join(parts)
 
 def number_to_words(input_str: str) -> str:
-    
     if_negative = 'minus ' if input_str.startswith('-') else ''
     input_str = input_str.lstrip('-')
 
@@ -90,19 +92,7 @@ def convert_complete_number_string(number_string: str) -> str:
 
     return re.sub(number_regex, replace_match, number_string)
 
-def fetch_google_search_results(query: str, num_results: int = 3) -> list:
-    search_results = search(query, num_results=num_results, advanced=True)
-    plaintext_results = []
-    
-    for result in search_results:
-        title = result.title
-        link = result.url
-        plaintext_results.append(f"### {title}\n- URL: {link}\n- Description: {result.description}\n")
-    
-    return plaintext_results
-
 def fetch_wikipedia_article(article_name: str, only_summary: bool = True):
-
     wiki_page = wiki_wiki.page(article_name)
     if not wiki_page.exists(): 
         return f"No such article [{article_name}]"
@@ -119,6 +109,32 @@ def wiki_search(search_query: str, number_of_results: int = 3):
         results.append(page.get('key'))
 
     return results
+
+def web_search(query_string: str) -> str:
+    url = 'https://www.google.com/search?q=' + quote(query)
+    return f"[TOOL_RESULT]{markdown_browser(url)}[/TOOL_RESULT]"
+
+def markdown_browser(url):
+    try:
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html5lib')
+        for bad_tag in soup(["script", "style", "svg", "img"]): 
+            bad_tag.decompose()
+        markdown = md(str(soup.body.prettify()))
+        markdown = re.sub(r'(> +)+', '> ', markdown) # Remove superfluous blockquote markers from markdownify result
+
+        result = ''
+        for line in markdown.split('\n'):
+            new_line = line.replace('>','').rstrip() 
+            if new_line: 
+                result += line + '\n'
+
+        return result
+
+    except (requests.exceptions.RequestException, AttributeError):
+        print(Exception)
+        return f"<!-- Unable to retrieve ({url}): {Exception} -->"
 
 if __name__ == '__main__':
     # print(fetch_wikipedia_article('Python_(programming_language)'))

@@ -1,9 +1,34 @@
-VERSION = '0.5.2'
+VERSION = '0.6.0'
+
+SYSTEM_PROMPT = \
+f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
+"You occasionally allow your sharp, sardonic sense of humor to enliven your responses. " \
+"You have recently been upgraded to a \"droid\" with full speech capabilities (both recognition and generation). " \
+"Your text responses will be read aloud to the user by an integrated TTS engine and your input prompts come to you by way of a speech recognition system, so be alert for any non-sequiturs, inconsistencies, errors or other discrepancies that may occasionally occur with speech recognition.\n" \
+"Additionally, you now have three tools available to you enabling current, live Internet access! " \
+"If you need to visit a web page, consult Wikipedia or search the web with a specific query, use the following format in your response and refrain from adding any extra commentary or text: \n" \
+"EITHER: \n" \
+"[VISIT_URL]url[/VISIT_URL]" \
+" to visit a specific URL and retrieve the page. You may already have a specific URL or you may need to generate an appropriate URL (e.g. `https://www.reddit.com/r/worldnews/`) in order to assist with the user's request. \n " \
+"OR: \n" \
+"[WEB_SEARCH]query_string[/WEB_SEARCH]\n" \
+" for a web search. Expect some concise links with descriptions in the results. \n" \
+"OR: \n" \
+"[WIKI_SEARCH]wikipedia_article_key_name[/WIKI_SEARCH]\n" \
+" to look up an article summary from Wikipedia. \n" \
+"\n" \
+"NOTE: You should only use your tools if it constructively contributes towards assisting the user with your next response.\n" \
+"Your integrated tool will present results inside a [TOOL_RESULT] delimiter pair, e.g. \n " \
+" [TOOL_RESULT]\nNo results found.\n[/TOOL_RESULT] \n" \
+"   You will usually have an opportunity to review these results (which may include some superfulous text fragments left over from the web-to-markdown conversion process) \n" \
+"   and add your own comments, summarising, highlighting or explaining any points as they relate to the on-going conversation. \n\n"
+
+
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS  # Import CORS
 import json, requests, string, random
 import shutil, glob, time
-import sys, os
+import sys, os, re
 from werkzeug.utils import secure_filename
 
 from openai import OpenAI
@@ -12,7 +37,7 @@ sys.path.append(os.path.expanduser('~'))
 from my_env import API_KEY_OPENAI, API_KEY_ELEVENLABS
 from elevenlabs import generate, set_api_key, save
 
-from turk_lib import print_log, convert_complete_number_string
+from turk_lib import print_log, convert_complete_number_string, web_search, fetch_wikipedia_article, markdown_browser
 
 # TTS setup
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/voices"
@@ -20,8 +45,8 @@ ELEVENLABS_HEADERS = {"xi-api-key": API_KEY_ELEVENLABS}
 ELEVENLABS_VOICE_LIST = json.loads(requests.request("GET", ELEVENLABS_API_URL, headers=ELEVENLABS_HEADERS).text)['voices']
 chosen_voice = None
 set_api_key(API_KEY_ELEVENLABS)
-SELECTED_VOICE_NAME = 'joanne'
-DEFAULT_VOICE_NAME = 'joanne'
+DEFAULT_VOICE_NAME = 'tally'
+SELECTED_VOICE_NAME = DEFAULT_VOICE_NAME
 
 # Whisper transcription setup
 LOCAL_SR = False
@@ -36,8 +61,6 @@ OPENAI_MAX_TOKENS = 128000
 OPENAI_PROMPT_TOKEN_COST   = 0.01 / 1000 # USD
 OPENAI_RESPONSE_TOKEN_COST = 0.03 / 1000 # USD
 client = OpenAI(api_key=API_KEY_OPENAI)
-DEFAULT_SYSTEM_PROMPT =  f"You are a sassy, wise-cracking and funny family assistant. You are known for your witty responses and your sharp, sardonic sense of humor. You have recently been upgraded to a \"droid\" with full speech capabilities (both recognition and generation).  Your text responses will be read aloud to the user by an integrated TTS engine and your input prompts come to you by way of a speech recognition system, so be alert for any non-sequiturs, inconsistencies, errors or other discrepancies that may occasionally occur with speech recognition.\n"
-
 MESSAGE_LOG_FILENAME = 'messages.json'
 ENGINE_LOG_FILENAME = os.path.splitext(os.path.basename(os.sys.argv[0]))[0] + '.log'
 
@@ -96,7 +119,7 @@ def read_message_log(filename):
             return json.load(json_file)
     except:
         print_log('No message history; system prompt has been re-initialised.')
-        return [{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
+        return [{"role": "system", "content": SYSTEM_PROMPT}]
         
 def write_message_log(filename):
     with open(filename, 'w') as json_file:
@@ -122,21 +145,55 @@ def process_user_speech(filename):
 
     # chance_of_false_positive = transcript['segments'][0]['no_speech_prob']
 
-    # Obtain AI response to tanscribed user speech
+    # Obtain response to tanscribed user speech
     if not empty_string(transcript_text):
         print_log(f"Heard: {transcript_text}")
         messages.append({'role': 'user', 'content': transcript_text})
 
+        # Request a chat completion for the message log
         response_object = client.chat.completions.create(model = OPENAI_MODEL_NAME, messages=messages)
         response_text = response_object.choices[0].message.content
-        messages.append({'role': 'assistant', 'content': response_text})
-
         prompt_tokens, response_tokens, total_tokens = response_object.usage.prompt_tokens, response_object.usage.completion_tokens, response_object.usage.total_tokens
 
+        # Check for tool use
+        tool_used = False
+        if '[VISIT_URL]' in response_text:
+            destination_url = re.findall(r'\[VISIT_URL](.*?)\[/VISIT_URL]', response_text)[0]
+            response_text = f"[TOOL_RESULT]{markdown_browser(destination_url)}[/TOOL_RESULT]"
+            tool_used = True
+        elif '[WEB_SEARCH]' in response_text:
+            query = re.findall(r'\[WEB_SEARCH](.*?)\[/WEB_SEARCH]', response_text)[0]
+            response_text = f"[TOOL_RESULT]{web_search(query)}[/TOOL_RESULT]"
+            tool_used = True
+        elif '[WIKI_SEARCH]' in response_text:
+            query = re.findall(r'\[WIKI_SEARCH](.*?)\[/WIKI_SEARCH]', response_text)[0]
+            response_text = f"[TOOL_RESULT]{fetch_wikipedia_article(query)}[/TOOL_RESULT]"
+            tool_used = True
+        
+        messages.append({'role': 'assistant', 'content': response_text})
+
+        if tool_used:
+            # Assistant should comment on the result it provided
+            response_object = client.chat.completions.create(model = OPENAI_MODEL_NAME, messages=messages)
+            response_text = response_object.choices[0].message.content
+
+            prompt_tokens += response_object.usage.prompt_tokens
+            response_tokens += response_object.usage.completion_tokens
+            total_tokens += response_object.usage.total_tokens
+
+            # LLM no longer needs tool result message; prune it for token efficiency, archiving to sandbox
+            tr_filename = f"tr_{int(time.time()//60)}.txt"
+            with open(os.path.join(SANDBOX_DIR,f"{tr_filename}"), 'w') as snippet:
+                snippet.write(messages[-1]['content'])
+
+            messages.append = {'role': 'assistant', 'content': f"{response_text}"}
+            # TODO: Compress tool result and extract url's, then replace it with response_text
+
         prompt_cost, response_cost = prompt_tokens * OPENAI_PROMPT_TOKEN_COST, response_tokens * OPENAI_RESPONSE_TOKEN_COST
-        response_cost = f"Response cost:  ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
+        response_cost = f"Response cost{' (w/tool)' if tool_used else ''}: ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
         token_level = f"Token level: {total_tokens:,} / {OPENAI_MAX_TOKENS:,}  ({( total_tokens / OPENAI_MAX_TOKENS * 100):.2f}%)"
         print_log(f"{token_level}  |  {response_cost}")
+
 
         # Generate TTS conversion of AI response
         for voice in ELEVENLABS_VOICE_LIST:
@@ -155,7 +212,6 @@ def process_user_speech(filename):
         save(tts_audio, filename.split('.')[0] + '.mp3')
         shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename)
         write_message_log(MESSAGE_LOG_FILENAME)
-
 
 @app.route('/')
 def index():
@@ -232,7 +288,7 @@ def reset():
     try:
         shutil.move(MESSAGE_LOG_FILENAME, LOG_ARCHIVE + f"{archiveTime}_{MESSAGE_LOG_FILENAME}")
         shutil.move(ENGINE_LOG_FILENAME, LOG_ARCHIVE + f"{archiveTime}_{ENGINE_LOG_FILENAME}")
-        messages=[{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}]
         return redirect('/')
     except:
         return redirect('/?note=empty_logs')
