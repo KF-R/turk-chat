@@ -44,10 +44,15 @@
         padding: 5px;
         border-radius: 5px;
         width: 90%;
+        white-space: pre-wrap; /* CSS 2.1 */
+        white-space: -moz-pre-wrap; /* For Mozilla */
+        white-space: -pre-wrap; /* For Opera 4-6 */
+        white-space: -o-pre-wrap; /* For Opera 7 */
+        word-wrap: break-word; /* Internet Explorer 5.5+ */
     }
     
     .system-message {
-        background-color: lightgrey;
+        background-color: lightpink;
         }
     
     .user-message {
@@ -89,6 +94,14 @@
         width:500px;
         background-color: #222;
     }
+
+    pre {
+        white-space: pre-wrap; /* CSS 2.1 */
+        white-space: -moz-pre-wrap; /* For Mozilla */
+        white-space: -pre-wrap; /* For Opera 4-6 */
+        white-space: -o-pre-wrap; /* For Opera 7 */
+        word-wrap: break-word; /* Internet Explorer 5.5+ */
+    }
     
     #nameDropdown {
         padding: 4px;  
@@ -119,7 +132,7 @@
 
 
 <script>
-// v0.5.2
+// v0.6.0
 let audioContext;
 let isRecording = false;
 let isProcessing = false; // Flag to indicate audio processing is ongoing
@@ -130,7 +143,7 @@ let startMarker = 0;
 let endMarker = 0;
 let endPersistCounter = 0;
 let startTime = 0;
-const END_PERSIST_PERIOD = 16; // How long to ignore silence when determining end of audio
+const END_PERSIST_PERIOD = 20; // How long to ignore silence when determining end of audio
 const BUFFER_SIZE = 4096;
 const PRE_ROLL = BUFFER_SIZE * 3; // Amount of preroll before the threshold is crossed
 const SAMPLE_RATE = 48000; // or use audioContext.sampleRate
@@ -424,6 +437,7 @@ async function loadAndDisplayChatLog(message_log_filename) {
         chatLog.forEach(entry => {
             switch (entry.role) {
                 case 'system':
+                    formattedHtml += `<div class="message system-message"><pre>${entry.content}</pre></div>`;
                     break;
                 case 'user':
                     formattedHtml += `<div class="message user-message">${entry.content}</div>`;
