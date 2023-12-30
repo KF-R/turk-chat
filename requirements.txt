@@ -1,7 +1,8 @@
+beautifulsoup4==4.10.0
 elevenlabs==0.2.26
 Flask==2.2.3
 Flask_Cors==3.0.10
-googlesearch_python==1.2.3
+markdownify==0.11.6
 openai==1.6.1
 openai_whisper==20231117
 Requests==2.31.0
