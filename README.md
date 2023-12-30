@@ -14,6 +14,7 @@
 * Filtered response is read via ElevenLabs Text-To-Speech API.
 * Spoken response is visualized by way of a real-time animation.
 * After the spoken response is complete, listening is resumed in order to facilitate fluid on-going conversation.
+* Integrated web access tools; **turk-chat** can grab current headlines, read wikipedia, summarise web pages etc.
 
 ### Usage:
 * Install requirements
