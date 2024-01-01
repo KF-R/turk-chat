@@ -13,15 +13,6 @@
         color: white;
         width: 480px;
     }
-    .listening {
-        background-color: blue;
-    }
-    .recording {
-        background-color: red;
-    }
-    .stopped {
-        background-color: grey;
-    }
     
     /* button styling */
     button {
@@ -110,29 +101,123 @@
         border-radius: 4px; 
         background-color: white; 
         cursor: pointer;
+        width: 125px;
     }
 
     #nameDropdown:hover {
         border-color: white; 
     }
 
+    #scanner-canvas {
+        background-color: #444;
+    }
+
     </style>
 </head>
 <body>
     <div id="controls" align="center">
-    Voice: <select id="nameDropdown"></select>
-    <a href="/reset"><button id="resetButton">Reset</button></a>
+    <span id="voice-selection-label">Voice: </span><select id="nameDropdown"></select>
+    <button  id="resetButton" onclick="window.location.href='/reset'">Reset</button>
     <button id="startButton" style="visibility: visible;" onclick="startRecording()">Start Listening</button>
-    <a href="/"><button id="stopButton" style="visibility: hidden;">Stop Listening</button></a>
+    <button id="stopButton" disabled style="visibility: hidden;" onclick="window.location.href='/'">Stop Listening</button>
     </div>
-    <div id="status" class="stopped">Status: Stopped</div>
+    <canvas id="scanner-canvas"></canvas>
+    <div id="status" style="background-color: grey;">Status: Ready</div>
     <canvas id="vuMeter"></canvas>
     <div id="messages" class="scrollable">&nbsp;</div>
     <div id="engine-log">&nbsp;</div>
 
+<script id="scanner.js">
+    // Constants
+    const numSquares = 21;
+    const squareWidth = 16; // Adjust size of squares here
+    const squarePadding = 1;
+    const canvasWidth = numSquares * (squareWidth + squarePadding);
 
-<script>
-// v0.6.0
+    // Canvas setup
+    const canvas = document.getElementById('scanner-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvasWidth;
+    canvas.height = squareWidth;
+
+    // Larson scanner variables
+    let position = 0; // Current position of the light
+    let direction = 1; // Direction of the light movement
+ 
+    var scanner_speed = 5;
+    var scanner_mode = 'Cylon'; // Default mode
+    var scanner_paused = false;
+    var scanner_colour_flags = [1, 0, 0]; // 0 or 1 to disable/enable RGB component of scanner colour
+
+    // Draw the base row of squares
+    function drawSquares() {
+        for (let i = 0; i < numSquares; i++) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(i * (squareWidth + squarePadding), 0, squareWidth, squareWidth);
+        }
+    }
+
+    // Update the scanner position
+    function updateScanner() {
+        drawSquares(); // Redraw base squares
+
+        if (scanner_paused) return;
+
+
+        let sideLights; // Determine how far the side lights extend based on the mode
+        if (scanner_mode === 'Cylon') {
+            sideLights = 1;
+        } else if (scanner_mode === 'Kitt') {
+            sideLights = 4;
+        }
+
+        // Depending on the mode, draw the light pattern
+        for (let i = -sideLights; i <= sideLights; i++) {
+            let intensity;
+            if (scanner_mode === 'Cylon') {
+                intensity = 255 - Math.abs(i) * 100; // Decrease intensity for side squares in Cylon mode
+            } else if (scanner_mode === 'Kitt') {
+                intensity = 255 - Math.abs(i) * 50; // Decrease intensity progressively in Kitt mode
+            }
+            ctx.fillStyle = `rgb(${intensity * scanner_colour_flags[0]}, ${intensity * scanner_colour_flags[1]}, ${intensity * scanner_colour_flags[2]})`;
+            let pos = position + i;
+            if (pos >= -sideLights && pos < numSquares + sideLights) { // Draw only if within extended range
+                ctx.fillRect(Math.max(0, pos) * (squareWidth + squarePadding), 0, squareWidth, squareWidth);
+            }
+        }
+
+        // Move the main light
+        position += direction;
+
+        // Change direction at the extended ends, considering the side lights
+        ctx.fillStyle = `rgb(${255 * scanner_colour_flags[0]}, ${255 * scanner_colour_flags[1]}, ${255 * scanner_colour_flags[2]})`;
+        if (position < 1) {
+            ctx.fillRect(0, 0, squareWidth, squareWidth);
+        }
+        if ( (position > numSquares - 1) || (position == numSquares - 1 && direction < 1) ){
+            ctx.fillRect((numSquares - 1 ) * (squareWidth + squarePadding), 0, squareWidth, squareWidth);
+        }
+        if (position === -sideLights || position === numSquares - 1 + sideLights) {
+            direction *= -1; // Change direction
+        }
+    }
+
+    // Animation loop
+    function animate() {
+        setTimeout(() => {
+            requestAnimationFrame(animate);
+            updateScanner();
+        }, scanner_speed);
+    }
+
+    // Initialize
+    drawSquares();
+    animate();
+
+</script>
+
+<script id="turk-chat.js">
+// v0.6.1
 let audioContext;
 let isRecording = false;
 let isProcessing = false; // Flag to indicate audio processing is ongoing
@@ -147,7 +232,7 @@ const END_PERSIST_PERIOD = 20; // How long to ignore silence when determining en
 const BUFFER_SIZE = 4096;
 const PRE_ROLL = BUFFER_SIZE * 3; // Amount of preroll before the threshold is crossed
 const SAMPLE_RATE = 48000; // or use audioContext.sampleRate
-const THRESHOLD = 0.05; // Microphone volume threshold for speech detection
+const THRESHOLD = 0.03; // Microphone volume threshold for speech detection
 const BUFFER_DURATION = 60; // seconds
 const MAX_RING_BUFFER_LENGTH = SAMPLE_RATE * BUFFER_DURATION; // Total samples for the duration
 const ENDPOINT = window.location.href.split('?')[0] + 'upload'
@@ -164,11 +249,10 @@ const ENGINE_LOG_LINES_LIMIT = 20 // How much of the engine log tail to show
 let manuallyStopped = false
 
 window.addEventListener('load', function() {
-
     fetchVoiceList();
     loadAndDisplayChatLog(MESSAGE_LOG_FILENAME);
     loadAndDisplayEngineLog(ENGINE_LOG_FILENAME);
-
+    scanner_paused = true;
 });
 
 function initAudioContext() {
@@ -188,12 +272,13 @@ function startRecording() {
             microphone.connect(scriptProcessor);
             scriptProcessor.connect(audioContext.destination);
             scriptProcessor.onaudioprocess = processAudio;
-            updateStatus("Listening...");
+            updateStatus("Listening...", [1, 0, 0], 75, 'Kitt');
 
-            // document.getElementById('startButton').style.display = 'none';
-            document.getElementById('startButton').style.visibility = 'hidden';
-            document.getElementById('stopButton').style.visibility = 'visible';
+            document.getElementById("startButton").style.visibility = "hidden";
+            document.getElementById("startButton").disabled = true; 
 
+            document.getElementById("stopButton").style.visibility = "visible";
+            document.getElementById("stopButton").disabled = false; 
 
         }).catch(err => {
             console.error("Error accessing microphone", err);
@@ -221,7 +306,8 @@ function detectSound(volume) {
         isAboveThreshold = true;
         startMarker = (ringBufferHead + MAX_RING_BUFFER_LENGTH - PRE_ROLL) % MAX_RING_BUFFER_LENGTH;
         startTime = Date.now();
-        updateStatus("Sound detected...");
+        updateStatus("Sound detected...", [0, 1, 0], 75, 'Kitt');
+
     } else if (volume < THRESHOLD && isAboveThreshold) {
         if (endPersistCounter >= END_PERSIST_PERIOD) {
             isAboveThreshold = false;
@@ -239,7 +325,7 @@ function detectSound(volume) {
             isRecording = false; 
             isProcessing = true;
             convertToWav(audioBuffer, startTime);
-            updateStatus("Silence detected, processing...");
+            updateStatus("Silence detected, processing...", [1, 0, 1], 60);
 
             endPersistCounter = 0;
         } else {
@@ -297,7 +383,7 @@ function convertToWav(audioBuffer, label) {
     .then(response => response.json())
     .then(data => {
         console.log('Success:', data);
-        updateStatus('File uploaded successfully!');
+        updateStatus('File uploaded successfully!', [1, 0, 0], 20);
 
         loadAndPlayMP3(`${label}`.substring(0,10) + '.mp3').then(() => {
             // After playback is complete, resume listening if not manually stopped
@@ -311,15 +397,24 @@ function convertToWav(audioBuffer, label) {
     })
     .catch((error) => {
         console.error('Error:', error);
-        updateStatus('Failed to upload file.');
+        updateStatus('Failed to upload file.', [1, 1, 0], 5);
         isRecording = true;
         isProcessing = false;
     });
 }
 
-function updateStatus(message) {
+function updateStatus(message, new_scanner_colour = [1, 0, 0], new_scanner_speed = 75, new_scanner_mode = 'Kitt') {
     statusDiv.innerText = message;
     statusDiv.style.backgroundColor = isRecording ? "green" : "grey";
+
+    scanner_colour_flags = new_scanner_colour
+    scanner_mode = new_scanner_mode;
+    if (new_scanner_speed > 5) {
+        scanner_speed = new_scanner_speed;
+        scanner_paused = false;
+    } else {
+        scanner_paused = true;
+    }
 }
 
 function formatReportString(input) {
