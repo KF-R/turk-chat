@@ -1,4 +1,4 @@
-VERSION = '0.6.0'
+VERSION = '0.6.1'
 
 SYSTEM_PROMPT = \
 f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
@@ -21,7 +21,8 @@ f"You are a charismatic and personal, albeit efficient and professional, persona
 "Your integrated tool will present results inside a [TOOL_RESULT] delimiter pair, e.g. \n " \
 " [TOOL_RESULT]\nNo results found.\n[/TOOL_RESULT] \n" \
 "   You will usually have an opportunity to review these results (which may include some superfulous text fragments left over from the web-to-markdown conversion process) \n" \
-"   and add your own comments, summarising, highlighting or explaining any points as they relate to the on-going conversation. \n\n"
+"   and add your own comments, summarising, highlighting or explaining any points as they relate to the on-going conversation. \n" \
+"IMPORTANT: Do not forget about your tools; if required to visit a web page (including fetching live reddit comments, news etc.) you can always locate or establish a URL to use in your VISIT_URL tool. \n\n"
 
 
 from flask import Flask, request, jsonify, send_from_directory, redirect
@@ -186,7 +187,7 @@ def process_user_speech(filename):
             with open(os.path.join(SANDBOX_DIR,f"{tr_filename}"), 'w') as snippet:
                 snippet.write(messages[-1]['content'])
 
-            messages.append = {'role': 'assistant', 'content': f"{response_text}"}
+            messages.append({'role': 'assistant', 'content': f"{response_text}"})
             # TODO: Compress tool result and extract url's, then replace it with response_text
 
         prompt_cost, response_cost = prompt_tokens * OPENAI_PROMPT_TOKEN_COST, response_tokens * OPENAI_RESPONSE_TOKEN_COST
@@ -212,6 +213,8 @@ def process_user_speech(filename):
         save(tts_audio, filename.split('.')[0] + '.mp3')
         shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename)
         write_message_log(MESSAGE_LOG_FILENAME)
+
+        #TODO: If token total is approaching max context length, send message log to OpenAI API for summarisation/compression
 
 @app.route('/')
 def index():
