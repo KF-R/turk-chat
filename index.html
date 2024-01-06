@@ -6,12 +6,12 @@
     <style>
     body {
         background-color: darkgrey;
-        width: 500px;
+        width: 600px;
     }
     #status {
         padding: 10px;
         color: white;
-        width: 480px;
+        width: 580px;
     }
     
     /* button styling */
@@ -44,16 +44,16 @@
     
     .system-message {
         background-color: lightpink;
-        }
+    }
     
     .user-message {
         background-color: lightblue;
         text-align: right;
-        }
+    }
     
     .assistant-message {
         background-color: lightgreen;
-        }
+    }
     
     #resetButton {
         background-color: darkred;        
@@ -61,9 +61,9 @@
 
     #messages {
         background-color: grey;    
-        width: 480px;
+        width: 580px;
         font-size: small;
-        }
+    }
     
     #engine-log {
         font-size: xx-small;
@@ -77,12 +77,15 @@
     }
     
     #controls {
-        padding: 6px;
+        border: dashed black 1px;
+        padding: 4px;
         font-size: small;
+        overflow: visible; /* Ensures text is visible */
+        white-space: nowrap; /* Prevents the text from wrapping */
     }
 
     canvas {
-        width:500px;
+        width:600px;
         background-color: #222;
     }
 
@@ -97,7 +100,7 @@
     #nameDropdown {
         padding: 4px;  
         margin: 2px 10px; 
-        border: 2px solid #000; 
+        border: 2px solid black; 
         border-radius: 4px; 
         background-color: white; 
         cursor: pointer;
@@ -112,12 +115,87 @@
         background-color: #444;
     }
 
+
+    /* Toggle CSS: */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 32px;
+        height: 16px;
+    }
+
+    /* Hide default HTML checkbox */
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    /* The slider */
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        -webkit-transition: .4s;
+        transition: .4s;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 8px;
+        width: 8px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        -webkit-transition: .4s;
+        transition: .4s;
+    }
+
+    input:checked + .slider {
+        background-color: #007bff;
+    }
+
+    input:focus + .slider {
+        box-shadow: 0 0 1px #007bff;
+    }
+
+    input:checked + .slider:before {
+        -webkit-transform: translateX(16px);
+        -ms-transform: translateX(16px);
+        transform: translateX(16px);
+    }
+
+    /* Rounded sliders */
+    .slider.round {
+        border-radius: 34px;
+    }
+
+    .slider.round:before {
+        border-radius: 50%;
+    }
+
+    /* Label Style */
+    label {
+        display: block;
+        font-size: 1em;
+        margin-bottom: 0px;
+    }
+
     </style>
 </head>
 <body>
     <div id="controls" align="center">
+        Model:&nbsp;&nbsp;<label class="switch">
+            <input type="checkbox" id="iq-switch" name="iq-switch"><span class="slider round"></span>
+        </label>
+        &nbsp;&nbsp;
     <span id="voice-selection-label">Voice: </span><select id="nameDropdown"></select>
-    <button  id="resetButton" onclick="window.location.href='/reset'">Reset</button>
+    <button id="resetButton" onclick="window.location.href='/reset'">Reset</button>
     <button id="startButton" style="visibility: visible;" onclick="startRecording()">Start Listening</button>
     <button id="stopButton" disabled style="visibility: hidden;" onclick="window.location.href='/'">Stop Listening</button>
     </div>
@@ -141,7 +219,7 @@
     canvas.height = squareWidth;
 
     // Larson scanner variables
-    let position = 0; // Current position of the light
+    let position = Math.floor(numSquares / 2); // Current position of the light
     let direction = 1; // Direction of the light movement
  
     var scanner_speed = 5;
@@ -210,14 +288,43 @@
         }, scanner_speed);
     }
 
+    // Change scanner mode
+    function changeMode(newMode = '') {
+        position = Math.floor(numSquares / 2); // Prevents modes with less sidelights getting stuck at direction change
+        if (newMode == '') {
+            scanner_mode = scanner_mode === 'Cylon' ? 'Kitt' : 'Cylon';
+        } else if (newMode == 'Cylon') {
+            scanner_mode = 'Cylon';
+        } else {
+            scanner_mode = 'Kitt';
+        }
+    }
+
     // Initialize
     drawSquares();
     animate();
 
+// TODO: 
+// DONE: Add TTS cost
+// Compress at context limit (disable if buffer token total is close to the higher max)
+// Model switch
+// Local TTS
+// Basic (kitt) / Advanced (current) visualisation
+// Handle ignored recordings properly
+// Ignore audio level trigger unless: flagged as ALWAYS_READY, ready_button is held down, or face detected and looking into camera
+
+
+// echo "..." | piper --model en_GB-northern_english_male-medium --output_file 'test.wav'
+// --model en_GB-northern_english_male-medium
+// --model en_GB-jenny_dioco-medium
+// --model en_US-danny-low
+// --model en_US-libritts_r-medium //// 1382 (15)
+
+
 </script>
 
 <script id="turk-chat.js">
-// v0.6.1
+// v0.6.3
 let audioContext;
 let isRecording = false;
 let isProcessing = false; // Flag to indicate audio processing is ongoing
@@ -232,7 +339,7 @@ const END_PERSIST_PERIOD = 20; // How long to ignore silence when determining en
 const BUFFER_SIZE = 4096;
 const PRE_ROLL = BUFFER_SIZE * 3; // Amount of preroll before the threshold is crossed
 const SAMPLE_RATE = 48000; // or use audioContext.sampleRate
-const THRESHOLD = 0.03; // Microphone volume threshold for speech detection
+const THRESHOLD = 0.04; // Microphone volume threshold for speech detection
 const BUFFER_DURATION = 60; // seconds
 const MAX_RING_BUFFER_LENGTH = SAMPLE_RATE * BUFFER_DURATION; // Total samples for the duration
 const ENDPOINT = window.location.href.split('?')[0] + 'upload'
@@ -246,13 +353,12 @@ const MESSAGE_LOG_FILENAME = 'messages.json'
 const ENGINE_LOG_FILENAME = 'turk_flask.log'
 const ENGINE_LOG_LINES_LIMIT = 20 // How much of the engine log tail to show
 
-let manuallyStopped = false
-
 window.addEventListener('load', function() {
     fetchVoiceList();
     loadAndDisplayChatLog(MESSAGE_LOG_FILENAME);
     loadAndDisplayEngineLog(ENGINE_LOG_FILENAME);
     scanner_paused = true;
+    document.getElementById('iq-switch').checked=true;
 });
 
 function initAudioContext() {
@@ -306,7 +412,7 @@ function detectSound(volume) {
         isAboveThreshold = true;
         startMarker = (ringBufferHead + MAX_RING_BUFFER_LENGTH - PRE_ROLL) % MAX_RING_BUFFER_LENGTH;
         startTime = Date.now();
-        updateStatus("Sound detected...", [0, 1, 0], 75, 'Kitt');
+        updateStatus("Sound detected...", [0, 1, 0], 75, 'Cylon');
 
     } else if (volume < THRESHOLD && isAboveThreshold) {
         if (endPersistCounter >= END_PERSIST_PERIOD) {
@@ -325,7 +431,7 @@ function detectSound(volume) {
             isRecording = false; 
             isProcessing = true;
             convertToWav(audioBuffer, startTime);
-            updateStatus("Silence detected, processing...", [1, 0, 1], 60);
+            updateStatus("Silence detected, processing...", [1, 0, 1], 60, 'Cylon');
 
             endPersistCounter = 0;
         } else {
@@ -374,7 +480,10 @@ function convertToWav(audioBuffer, label) {
     formData.append("audio", blob, label + '.wav');
 
     let selectedName = document.getElementById('nameDropdown').value;
-    formData.append("name", selectedName);    
+    formData.append("name", selectedName);
+
+    var iqValue = document.getElementById('iq-switch').checked ? 'on' : 'off';
+    formData.set('advanced_model', iqValue);
 
     fetch(ENDPOINT, {
         method: 'POST',
@@ -383,21 +492,19 @@ function convertToWav(audioBuffer, label) {
     .then(response => response.json())
     .then(data => {
         console.log('Success:', data);
-        updateStatus('File uploaded successfully!', [1, 0, 0], 20);
+        updateStatus('File uploaded successfully!', [1, 0, 0], 20, 'Cylon');
 
         loadAndPlayMP3(`${label}`.substring(0,10) + '.mp3').then(() => {
-            // After playback is complete, resume listening if not manually stopped
-            if (!manuallyStopped) { // Ensure there's a mechanism to handle manual stop
-                isRecording = true;
-                isProcessing = false;
-            }
-            updateStatus("Listening...");
+            // After playback is complete, resume listening
+            isRecording = true;
+            isProcessing = false;
+            updateStatus("Listening...", [1, 0, 0], 75);
         });
 
     })
     .catch((error) => {
         console.error('Error:', error);
-        updateStatus('Failed to upload file.', [1, 1, 0], 5);
+        updateStatus('Failed to upload file.', [1, 1, 0], 5, 'Cylon');
         isRecording = true;
         isProcessing = false;
     });
@@ -408,7 +515,9 @@ function updateStatus(message, new_scanner_colour = [1, 0, 0], new_scanner_speed
     statusDiv.style.backgroundColor = isRecording ? "green" : "grey";
 
     scanner_colour_flags = new_scanner_colour
-    scanner_mode = new_scanner_mode;
+    if (new_scanner_mode != scanner_mode) {
+        changeMode(new_scanner_mode);
+    }
     if (new_scanner_speed > 5) {
         scanner_speed = new_scanner_speed;
         scanner_paused = false;
@@ -422,7 +531,6 @@ function formatReportString(input) {
     
     if(parts.length === 2) {
         // Return the HTML string with left and right aligned spans
-        console.warn(parts.length);
         return `<span style="float: left;">${parts[0].trim()}</span><span style="float: right;">${parts[1].trim()}</span>`;
     } else {
         // Return the original input if it doesn't contain a pipe character or is not split into two parts
@@ -600,13 +708,21 @@ async function fetchVoiceList() {
             const option = document.createElement('option');
             option.value = name;
             option.text = name;
+            option.selected = true;
             nameDropdown.appendChild(option);
+        }
+        
+        // Set the first option as selected
+        if (nameDropdown.options.length > 0) {
+            nameDropdown.options.remove(0);
+            nameDropdown.options[0].selected = true;
         }
 
     } catch (error) {
         console.error('Failed to parse TTS voice list.', error);
     }      
 }
+
 
 </script>
 </body>

@@ -1,4 +1,4 @@
-VERSION = '0.6.1'
+VERSION = '0.6.3'
 
 SYSTEM_PROMPT = \
 f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
@@ -39,6 +39,7 @@ from my_env import API_KEY_OPENAI, API_KEY_ELEVENLABS
 from elevenlabs import generate, set_api_key, save
 
 from turk_lib import print_log, convert_complete_number_string, web_search, fetch_wikipedia_article, markdown_browser
+from fast_local_tts import text_to_mp3
 
 # TTS setup
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/voices"
@@ -46,8 +47,9 @@ ELEVENLABS_HEADERS = {"xi-api-key": API_KEY_ELEVENLABS}
 ELEVENLABS_VOICE_LIST = json.loads(requests.request("GET", ELEVENLABS_API_URL, headers=ELEVENLABS_HEADERS).text)['voices']
 chosen_voice = None
 set_api_key(API_KEY_ELEVENLABS)
-DEFAULT_VOICE_NAME = 'tally'
+DEFAULT_VOICE_NAME = '<LOCAL>'
 SELECTED_VOICE_NAME = DEFAULT_VOICE_NAME
+TTS_COST = 0.00025 # Per character
 
 # Whisper transcription setup
 LOCAL_SR = False
@@ -57,13 +59,17 @@ local_whisper = whisper.load_model(LOCAL_WHISPER_MODEL_NAME)
 WHISPER_API_MODEL_NAME = 'whisper-1'
 
 # OpenAI API setup
-OPENAI_MODEL_NAME = 'gpt-4-1106-preview' # gpt-4-1106-vision-preview
-OPENAI_MAX_TOKENS = 128000
-OPENAI_PROMPT_TOKEN_COST   = 0.01 / 1000 # USD
-OPENAI_RESPONSE_TOKEN_COST = 0.03 / 1000 # USD
+OPENAI_MODEL_NAMES = ['gpt-4-1106-preview', 'gpt-3.5-turbo-1106'] # gpt-4-1106-vision-preview
+OPENAI_TOKEN_LIMITS = [128000, 16000]
+OPENAI_PROMPT_TOKEN_COSTS   = [(0.01 / 1000), ( 0.001 / 1000)] # USD
+OPENAI_RESPONSE_TOKEN_COSTS = [(0.03 / 1000), ( 0.002 / 1000)] # USD
+model_index = 0 # Default (advanced) model is the first one
+openai_model_name, openai_max_tokens, openai_prompt_token_cost, openai_response_token_cost = OPENAI_MODEL_NAMES[model_index], OPENAI_TOKEN_LIMITS[model_index], OPENAI_PROMPT_TOKEN_COSTS[model_index], OPENAI_RESPONSE_TOKEN_COSTS[model_index]
+
 client = OpenAI(api_key=API_KEY_OPENAI)
 MESSAGE_LOG_FILENAME = 'messages.json'
 ENGINE_LOG_FILENAME = os.path.splitext(os.path.basename(os.sys.argv[0]))[0] + '.log'
+
 
 PLAYED_AUDIO_ARCHIVE = 'audio_out/'
 if not os.path.exists(PLAYED_AUDIO_ARCHIVE):  os.makedirs(PLAYED_AUDIO_ARCHIVE)
@@ -126,6 +132,32 @@ def write_message_log(filename):
     with open(filename, 'w') as json_file:
         json.dump(messages, json_file, indent=4)
 
+def response_to_mp3(response_text: str, filename: str):
+    # Generate TTS conversion of AI response
+
+    # Apply number, grammar, syntax etc. filters for improved TTS
+    voiced_response_text = convert_complete_number_string(message_filter(response_text))
+
+    if '<LOCAL>' in SELECTED_VOICE_NAME:
+        # Use local TTS
+        text_to_mp3(voiced_response_text, filename.split('.')[0])
+    else:
+        # Use ElevenLabs API TTS
+        for voice in ELEVENLABS_VOICE_LIST:
+            if SELECTED_VOICE_NAME.upper() in voice['name'].upper(): chosen_voice = voice
+            
+        if not chosen_voice: chosen_voice = random.choice(ELEVENLABS_VOICE_LIST)
+
+        tts_audio = generate(
+            text = voiced_response_text,
+            voice = chosen_voice['name'],
+            model = "eleven_turbo_v2"
+            )
+            
+        save(tts_audio, filename.split('.')[0] + '.mp3')
+
+    return voiced_response_text
+
 def process_user_speech(filename):
     global transcript, messages
 
@@ -144,15 +176,17 @@ def process_user_speech(filename):
             file=audio_file,
             response_format="text" )).rstrip()
 
-    # chance_of_false_positive = transcript['segments'][0]['no_speech_prob']
-
+    # Archive recorded user speech
+    shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename) 
+   
     # Obtain response to tanscribed user speech
+    openai_model_name, openai_max_tokens, openai_prompt_token_cost, openai_response_token_cost = OPENAI_MODEL_NAMES[model_index], OPENAI_TOKEN_LIMITS[model_index], OPENAI_PROMPT_TOKEN_COSTS[model_index], OPENAI_RESPONSE_TOKEN_COSTS[model_index]
     if not empty_string(transcript_text):
         print_log(f"Heard: {transcript_text}")
         messages.append({'role': 'user', 'content': transcript_text})
 
         # Request a chat completion for the message log
-        response_object = client.chat.completions.create(model = OPENAI_MODEL_NAME, messages=messages)
+        response_object = client.chat.completions.create(model = openai_model_name, messages=messages)
         response_text = response_object.choices[0].message.content
         prompt_tokens, response_tokens, total_tokens = response_object.usage.prompt_tokens, response_object.usage.completion_tokens, response_object.usage.total_tokens
 
@@ -175,7 +209,7 @@ def process_user_speech(filename):
 
         if tool_used:
             # Assistant should comment on the result it provided
-            response_object = client.chat.completions.create(model = OPENAI_MODEL_NAME, messages=messages)
+            response_object = client.chat.completions.create(model = openai_model_name, messages=messages)
             response_text = response_object.choices[0].message.content
 
             prompt_tokens += response_object.usage.prompt_tokens
@@ -190,31 +224,25 @@ def process_user_speech(filename):
             messages.append({'role': 'assistant', 'content': f"{response_text}"})
             # TODO: Compress tool result and extract url's, then replace it with response_text
 
-        prompt_cost, response_cost = prompt_tokens * OPENAI_PROMPT_TOKEN_COST, response_tokens * OPENAI_RESPONSE_TOKEN_COST
+        prompt_cost, response_cost = prompt_tokens * openai_prompt_token_cost, response_tokens * openai_response_token_cost
         response_cost = f"Response cost{' (w/tool)' if tool_used else ''}: ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
-        token_level = f"Token level: {total_tokens:,} / {OPENAI_MAX_TOKENS:,}  ({( total_tokens / OPENAI_MAX_TOKENS * 100):.2f}%)"
+        token_level = f"Token level: {total_tokens:,} / {openai_max_tokens:,}  ({( total_tokens / openai_max_tokens * 100):.2f}%)"
         print_log(f"{token_level}  |  {response_cost}")
 
-
-        # Generate TTS conversion of AI response
-        for voice in ELEVENLABS_VOICE_LIST:
-            if SELECTED_VOICE_NAME.upper() in voice['name'].upper(): chosen_voice = voice
-            
-        if not chosen_voice: chosen_voice = random.choice(ELEVENLABS_VOICE_LIST)
-
-        print_log(f"{chosen_voice['name'].capitalize()} responded with {response_tokens} tokens.")
-
-        tts_audio = generate(
-            text = convert_complete_number_string(message_filter(response_text)),
-            voice = chosen_voice['name'],
-            model = "eleven_turbo_v2"
-            )
-        
-        save(tts_audio, filename.split('.')[0] + '.mp3')
-        shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename)
+        # Update conversation record
         write_message_log(MESSAGE_LOG_FILENAME)
 
+        # Generate TTS conversion of AI response
+        voiced_response_text = response_to_mp3(response_text, filename)
+
+        response_characters = len(voiced_response_text)
+        response_cost_report = '0.0000' if SELECTED_VOICE_NAME == '<LOCAL>' else f"{(response_characters * TTS_COST):.4f}  "
+        voice_description = ' local voice' if SELECTED_VOICE_NAME == '<LOCAL>' else f" voice '{SELECTED_VOICE_NAME}'"
+        print_log(f"{openai_model_name} responded with {response_characters:,} characters (from {response_tokens} tokens) using{voice_description}. | TTS cost: ${response_cost_report}  ")
+
         #TODO: If token total is approaching max context length, send message log to OpenAI API for summarisation/compression
+    else:
+        text_to_mp3(f"I'm sorry, I didn't quite catch that.", filename.split('.')[0])
 
 @app.route('/')
 def index():
@@ -222,9 +250,15 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    global SELECTED_VOICE_NAME
+    global SELECTED_VOICE_NAME, model_index
     print_log('Audio submission received.')
     if 'audio' in request.files:
+
+        local_sr_value = request.form.get('local_sr')
+        advanced_model_value = request.form.get('advanced_model')
+
+        model_index = 0 if advanced_model_value == 'on' else 1
+
         audio = request.files['audio']
         original_filename = audio.filename
 
@@ -237,10 +271,13 @@ def upload_file():
 
         desired_voice_name = request.form.get('name')
         if desired_voice_name:
-            for voice in ELEVENLABS_VOICE_LIST:
-                if desired_voice_name.upper() in voice['name'].upper(): 
-                    SELECTED_VOICE_NAME = voice['name']
-
+            if '<LOCAL>' in desired_voice_name:
+                SELECTED_VOICE_NAME = desired_voice_name
+            else:                
+                for voice in ELEVENLABS_VOICE_LIST:
+                    if desired_voice_name.upper() in voice['name'].upper(): 
+                        SELECTED_VOICE_NAME = voice['name']
+      
         else: SELECTED_VOICE_NAME = DEFAULT_VOICE_NAME    
 
         process_user_speech(safe_filename)
@@ -298,7 +335,7 @@ def reset():
 
 @app.route('/voices')
 def voice_list():
-    return [d['name'] for d in ELEVENLABS_VOICE_LIST]
+    return ['<LOCAL>'] + [d['name'] for d in ELEVENLABS_VOICE_LIST]
 
 @app.route('/version')
 def get_version():
