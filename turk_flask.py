@@ -1,4 +1,4 @@
-VERSION = '0.6.3'
+VERSION = '0.6.4'
 
 SYSTEM_PROMPT = \
 f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
@@ -33,13 +33,14 @@ import sys, os, re
 from werkzeug.utils import secure_filename
 
 from openai import OpenAI
-import whisper
+
 sys.path.append(os.path.expanduser('~'))
 from my_env import API_KEY_OPENAI, API_KEY_ELEVENLABS
 from elevenlabs import generate, set_api_key, save
 
 from turk_lib import print_log, convert_complete_number_string, web_search, fetch_wikipedia_article, markdown_browser
 from fast_local_tts import text_to_mp3
+from fast_local_sr import fast_transcribe
 
 # TTS setup
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/voices"
@@ -52,11 +53,8 @@ SELECTED_VOICE_NAME = DEFAULT_VOICE_NAME
 TTS_COST = 0.00025 # Per character
 
 # Whisper transcription setup
-LOCAL_SR = False
-LOCAL_WHISPER_MODEL_NAME = 'base.en' # tiny.en,base.en,small.en,medium.en,large
-local_whisper = whisper.load_model(LOCAL_WHISPER_MODEL_NAME)
-
-WHISPER_API_MODEL_NAME = 'whisper-1'
+LOCAL_SR = True
+WHISPER_API_MODEL_NAME = 'whisper-1'  # Only for API. Unused if using local SR.
 
 # OpenAI API setup
 OPENAI_MODEL_NAMES = ['gpt-4-1106-preview', 'gpt-3.5-turbo-1106'] # gpt-4-1106-vision-preview
@@ -117,6 +115,7 @@ def message_filter(msg: str = ''):
     if len(codeblocks)>0:
         r = cleaned_text + f"\n\nYou'll find the {len(codeblocks) if len(codeblocks) > 1 else ''} code block{'s' if len(codeblocks) > 1 else ''} that I've generated in the sandbox."
     r = r.replace('=',' equals ')
+    r = re.sub(r'\(?https?:\/\/[^\s)]*\)?', '', r) # Remove URLs and surrounding parentheses
     return r
 
 def read_message_log(filename):
@@ -167,8 +166,7 @@ def process_user_speech(filename):
 
     # Obtain transcript of user speech
     if LOCAL_SR:
-        transcript = local_whisper.transcribe(filename, language = 'en')
-        transcript_text = transcript['text'].rstrip()
+        transcript_text, no_speech_prob = fast_transcribe(filename)
     else:
         audio_file = open(filename, "rb")
         transcript_text = str(client.audio.transcriptions.create(

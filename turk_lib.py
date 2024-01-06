@@ -70,8 +70,20 @@ def convert_to_words(number) -> str:
     return ' '.join(parts)
 
 def number_to_words(input_str: str) -> str:
-    if_negative = 'minus ' if input_str.startswith('-') else ''
-    input_str = input_str.lstrip('-')
+    # if_negative = 'minus ' if input_str.startswith('-') else ''
+
+    # Handle negatives
+    if input_str.startswith('-'):
+        if_negative = 'minus '
+        input_str = input_str.lstrip('-')
+    else:
+        # Not negative; handle possible years
+        if_negative = ''
+        if ',' not in input_str and '.' not in input_str and len(input_str) == 4:
+            # Might be a year
+            year = int(input_str)
+            if year < 2000 or year > 2009:
+                return number_to_words(input_str[:2]) + ' ' + number_to_words(input_str[-2:])
 
     parts = input_str.replace(',', '').split('.')
     integer_part = int(parts[0])
