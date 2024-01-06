@@ -305,26 +305,14 @@
     animate();
 
 // TODO: 
-// DONE: Add TTS cost
 // Compress at context limit (disable if buffer token total is close to the higher max)
-// Model switch
-// Local TTS
 // Basic (kitt) / Advanced (current) visualisation
-// Handle ignored recordings properly
 // Ignore audio level trigger unless: flagged as ALWAYS_READY, ready_button is held down, or face detected and looking into camera
-
-
-// echo "..." | piper --model en_GB-northern_english_male-medium --output_file 'test.wav'
-// --model en_GB-northern_english_male-medium
-// --model en_GB-jenny_dioco-medium
-// --model en_US-danny-low
-// --model en_US-libritts_r-medium //// 1382 (15)
-
 
 </script>
 
 <script id="turk-chat.js">
-// v0.6.3
+// v0.6.4
 let audioContext;
 let isRecording = false;
 let isProcessing = false; // Flag to indicate audio processing is ongoing
@@ -358,7 +346,7 @@ window.addEventListener('load', function() {
     loadAndDisplayChatLog(MESSAGE_LOG_FILENAME);
     loadAndDisplayEngineLog(ENGINE_LOG_FILENAME);
     scanner_paused = true;
-    document.getElementById('iq-switch').checked=true;
+    // document.getElementById('iq-switch').checked=true;
 });
 
 function initAudioContext() {
