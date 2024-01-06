@@ -1,8 +1,7 @@
 ## turk-chat conversation agent
 <sub>_If you're looking for the older async pygame version: https://github.com/KF-R/turk-chat-pygame_</sub>
 <hr/>
-
-<img src="https://github.com/KF-R/turk-chat/assets/6677966/1896d8b8-7108-4cd2-a76b-edb28bdca90a" width="230px" align="right"/>
+<img src="https://github.com/KF-R/turk-chat/assets/6677966/986e1630-8c98-4249-a9cd-55e48cec148b" width="262px" align="right"/>
 
 ### Features:
 * Ultra-lightweight; only a Python Flask server and a single html file with in-line vanilla JS
@@ -48,4 +47,11 @@ As written, it expects `'my_env.py'` in your home directory; its contents defini
 API_KEY_OPENAI = '<insert_your_OpenAI_API_key_here>'
 API_KEY_ELEVENLABS = '<insert_your_ElevenLabs_API_key_here>'
 ```
+
+
+<p/>
+<hr/>
+v0.4.x <br/>
+
+<img src="https://github.com/KF-R/turk-chat/assets/6677966/1896d8b8-7108-4cd2-a76b-edb28bdca90a" width="115px"/>
 
