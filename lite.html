@@ -2,10 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>turk-chat-web</title>
+    <title>turk-chat-web-lite</title>
     <link rel="stylesheet" href="turk-chat.css">
 </head>
 <body>
+    <canvas id="scanner-canvas"></canvas>
+    <canvas id="kitt"></canvas>
+    <div id="status" style="background-color: grey;">Status: Ready</div>
     <div id="controls" align="center">
         Model:&nbsp;&nbsp;<label class="switch">
             <input type="checkbox" id="iq-switch" name="iq-switch"><span class="slider round"></span>
@@ -14,17 +17,12 @@
         <span id="voice-selection-label">Voice: </span><select id="nameDropdown"></select>
         <button id="resetButton" onclick="window.location.href='/reset'">Reset</button>
         <button id="startButton" style="visibility: visible;" onclick="startRecording()">Start Listening</button>
-        <button id="stopButton" disabled style="visibility: hidden;" onclick="window.location.href='/'">Stop Listening</button>
+        <button id="stopButton" disabled style="visibility: hidden;" onclick="window.location.href='/lite'">Stop Listening</button>
+        <hr/>
+        <button id="full-ui-button" onclick="window.location.href='/'">Full User Interface</button></div>
     </div>
-    <canvas id="scanner-canvas"></canvas>
-    <div id="status" style="background-color: grey;">Status: Ready</div>
-    <canvas id="vuMeter"></canvas>
-    <div id="messages" class="scrollable">&nbsp;</div>
-    <div id="engine-log">&nbsp;</div>
-    <hr/>
-    <div id="links"><button id="simplified-ui-button" onclick="window.location.href='/lite'">Simplified UI</button></div>
-
 <script src="scanner.js" id="scanner.js"></script>
 <script src="turk-chat.js" id="turk-chat.js"></script>
+<script src="kittviz.js" id="kittviz.js"></script>
 </body>
 </html>

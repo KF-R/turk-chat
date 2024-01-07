@@ -1,5 +1,5 @@
-VERSION = '0.6.4'
-
+VERSION = '0.7.0'
+# TODO: Compress conversation history near context limit ( and disable basic model if token total is close to its max)
 SYSTEM_PROMPT = \
 f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
 "You occasionally allow your sharp, sardonic sense of humor to enliven your responses. " \
@@ -206,7 +206,7 @@ def process_user_speech(filename):
         messages.append({'role': 'assistant', 'content': response_text})
 
         if tool_used:
-            # Assistant should comment on the result it provided
+
             response_object = client.chat.completions.create(model = openai_model_name, messages=messages)
             response_text = response_object.choices[0].message.content
 
@@ -215,16 +215,16 @@ def process_user_speech(filename):
             total_tokens += response_object.usage.total_tokens
 
             # LLM no longer needs tool result message; prune it for token efficiency, archiving to sandbox
-            tr_filename = f"tr_{int(time.time()//60)}.txt"
-            with open(os.path.join(SANDBOX_DIR,f"{tr_filename}"), 'w') as snippet:
+            tr_filename = f"tr_{int(time.time() // 60)}.txt"
+            with open(os.path.join(SANDBOX_DIR, f"{tr_filename}"), 'w') as snippet:
                 snippet.write(messages[-1]['content'])
 
             messages.append({'role': 'assistant', 'content': f"{response_text}"})
-            # TODO: Compress tool result and extract url's, then replace it with response_text
 
         prompt_cost, response_cost = prompt_tokens * openai_prompt_token_cost, response_tokens * openai_response_token_cost
         response_cost = f"Response cost{' (w/tool)' if tool_used else ''}: ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
-        token_level = f"Token level: {total_tokens:,} / {openai_max_tokens:,}  ({( total_tokens / openai_max_tokens * 100):.2f}%)"
+        # Reported token_level takes tool response into account for cost calculation only
+        token_level = f"Token level: {(total_tokens if not tool_used else (total_tokens - response_object.usage.total_tokens)):,} / {openai_max_tokens:,}  ({( total_tokens / openai_max_tokens * 100):.2f}%)"
         print_log(f"{token_level}  |  {response_cost}")
 
         # Update conversation record
@@ -245,6 +245,10 @@ def process_user_speech(filename):
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
+
+@app.route('/lite')
+def lite_index():
+    return send_from_directory('.', 'lite.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -297,6 +301,24 @@ def response_file(filename):
         # Log an error message or return a custom 404 error
         return "File not found", 404
 
+@app.route('/<filename>.js')
+def serve_js(filename):
+    try:
+        secure_filename_str = secure_filename(f"{filename}.js")
+        return send_from_directory('.', secure_filename_str)
+    except FileNotFoundError:
+        # Log an error message or return a custom 404 error
+        return "File not found", 404
+
+@app.route('/<filename>.css')
+def serve_css(filename):
+    try:
+        secure_filename_str = secure_filename(f"{filename}.css")
+        return send_from_directory('.', secure_filename_str)
+    except FileNotFoundError:
+        # Log an error message or return a custom 404 error
+        return "File not found", 404
+
 @app.route('/<filename>.json')
 def message_log_file(filename):
     try:
@@ -314,10 +336,6 @@ def engine_log_file(filename):
     except FileNotFoundError:
         # Log an error message or return a custom 404 error
         return "File not found", 404
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory('.', 'favicon.ico', mimetype='image/x-icon')
 
 @app.route('/reset')
 def reset():
@@ -338,6 +356,10 @@ def voice_list():
 @app.route('/version')
 def get_version():
     return f"v{VERSION}"
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('.', 'favicon.ico', mimetype='image/x-icon')
 
 if __name__ == '__main__':
     print_log(f"v{VERSION}: Initialising...")
