@@ -4,7 +4,7 @@
 <img src="https://github.com/KF-R/turk-chat/assets/6677966/986e1630-8c98-4249-a9cd-55e48cec148b" width="262px" align="right"/>
 
 ### Features:
-* Ultra-lightweight; only a Python Flask server and a single html file with in-line vanilla JS
+* Ultra-lightweight; only a Python Flask server and vanilla JS.
 * Integrated ring buffer, sound activity detection algorithm and real-time animated speech visualization.
 * Automatic speech detection with termination detection; no push-to-talk or activation (listens, responds, listens... )
 * Speech is recorded, transcribed by either the OpenAI Whisper API or CTranslate2-based fast Whisper:
@@ -18,6 +18,7 @@
 * Integrated web access tools; **turk-chat** can grab current headlines, read wikipedia, summarise web pages etc.
 * Toggle between basic and advanced LLM back ends (e.g. GPT-3.5 vs GPT-4)
 * Obligatory Larsson scanner using KITT and Cylon modes for a bit of additional visual feedback.
+* Simlified UI mode added (with KITT head-unit visualizer).
 
 ### Usage:
 * Install requirements
