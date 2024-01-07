@@ -1,0 +1,182 @@
+body {
+    background-color: darkgrey;
+    width: 600px;
+}
+#status {
+    padding: 10px;
+    color: white;
+    width: 580px;
+}
+
+/* button styling */
+button {
+    padding: 8px 16px;
+    font-size: 12px;
+    color: white;
+    background-color: #007bff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+.message {
+    margin-left: 10px;
+    margin-bottom: 10px;
+    padding: 5px;
+    border-radius: 5px;
+    width: 90%;
+    white-space: pre-wrap; /* CSS 2.1 */
+    white-space: -moz-pre-wrap; /* For Mozilla */
+    white-space: -pre-wrap; /* For Opera 4-6 */
+    white-space: -o-pre-wrap; /* For Opera 7 */
+    word-wrap: break-word; /* Internet Explorer 5.5+ */
+}
+
+.system-message {
+    background-color: lightpink;
+}
+
+.user-message {
+    background-color: lightblue;
+    text-align: right;
+}
+
+.assistant-message {
+    background-color: lightgreen;
+}
+
+#resetButton {
+    background-color: darkred;        
+}
+
+#messages {
+    background-color: grey;    
+    width: 580px;
+    font-size: small;
+}
+
+#engine-log {
+    font-size: xx-small;
+}
+
+.scrollable {
+    max-height: 420px; 
+    overflow-y: scroll;
+    border: 1px solid #ccc; 
+    padding: 10px;
+}
+
+#controls {
+    border: dashed black 1px;
+    padding: 4px;
+    font-size: small;
+    overflow: visible; /* Ensures text is visible */
+    white-space: nowrap; /* Prevents the text from wrapping */
+}
+
+canvas {
+    width:600px;
+    background-color: #222;
+}
+
+pre {
+    white-space: pre-wrap; /* CSS 2.1 */
+    white-space: -moz-pre-wrap; /* For Mozilla */
+    white-space: -pre-wrap; /* For Opera 4-6 */
+    white-space: -o-pre-wrap; /* For Opera 7 */
+    word-wrap: break-word; /* Internet Explorer 5.5+ */
+}
+
+#nameDropdown {
+    padding: 4px;  
+    margin: 2px 10px; 
+    border: 2px solid black; 
+    border-radius: 4px; 
+    background-color: white; 
+    cursor: pointer;
+    width: 125px;
+}
+
+#nameDropdown:hover {
+    border-color: white; 
+}
+
+#scanner-canvas {
+    background-color: #444;
+}
+
+
+/* Toggle CSS: */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 32px;
+    height: 16px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* The slider */
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 8px;
+    width: 8px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: #007bff;
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px #007bff;
+}
+
+input:checked + .slider:before {
+    -webkit-transform: translateX(16px);
+    -ms-transform: translateX(16px);
+    transform: translateX(16px);
+}
+
+/* Rounded sliders */
+.slider.round {
+    border-radius: 34px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* Label Style */
+label {
+    display: block;
+    font-size: 1em;
+    margin-bottom: 0px;
+}
+
