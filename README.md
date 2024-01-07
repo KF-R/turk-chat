@@ -16,7 +16,7 @@
 * Spoken response is visualized by way of a real-time waveform animation.
 * After the spoken response is complete, listening is resumed in order to facilitate fluid on-going conversation.
 * Integrated web access tools; **turk-chat** can grab current headlines, read wikipedia, summarise web pages etc.
-* Toggle between basic and advanced LLM back ends (e.g. GPT-3.5 vs GPT-4.5)
+* Toggle between basic and advanced LLM back ends (e.g. GPT-3.5 vs GPT-4)
 * Obligatory Larsson scanner using KITT and Cylon modes for a bit of additional visual feedback.
 
 ### Usage:
@@ -30,7 +30,7 @@
 * After your chat agent has finished speaking its response, it will automatically resume listening.
 * The `Voice` drop-down list is populated with the voice names from your ElevenLabs voice library.  
 * You can change the responding voice without affecting the on-going conversation
-* Use the `model` switch to toggle between basic (e.g. GPT-3.5) and advanced (e.g. GPT-4.5) models.
+* Use the `model` switch to toggle between basic (e.g. GPT-3.5) and advanced (e.g. GPT-4) models.
 * To stop listening, click the `Stop Listening` button or refresh the page.
 * To clear/archive the chat message and engine logs, click the `Reset` button. 
 * Archived conversations will be stored in the `archive` directory.
