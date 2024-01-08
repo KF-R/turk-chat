@@ -1,4 +1,4 @@
-VERSION = '0.7.1'
+VERSION = '0.7.2'
 # TODO: Compress conversation history near context limit ( and disable basic model if token total is close to its max)
 SYSTEM_PROMPT = \
 f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
@@ -42,7 +42,7 @@ from turk_lib import print_log, convert_complete_number_string, web_search, fetc
 from fast_local_tts import text_to_mp3
 from fast_local_sr import fast_transcribe
 
-LIBDIR = '.'
+LIBDIR = 'lib/'
 
 # TTS setup
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/voices"
