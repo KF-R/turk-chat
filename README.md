@@ -18,7 +18,7 @@
 * Integrated web access tools; **turk-chat** can grab current headlines, read wikipedia, summarise web pages etc.
 * Toggle between basic and advanced LLM back ends (e.g. GPT-3.5 vs GPT-4)
 * Obligatory Larsson scanner using KITT and Cylon modes for a bit of additional visual feedback.
-* Simlified UI mode added (with KITT head-unit visualizer).
+* Simplified UI mode added (with KITT head-unit visualizer).
 
 ### Usage:
 * Install requirements
