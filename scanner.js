@@ -29,6 +29,8 @@ function drawSquares() {
 
 // Update the scanner position
 function updateScanner() {
+    ctx.fillStyle = '#666';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     drawSquares(); // Redraw base squares
 
     if (scanner_paused) return;

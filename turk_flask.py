@@ -1,4 +1,4 @@
-VERSION = '0.7.0'
+VERSION = '0.7.1'
 # TODO: Compress conversation history near context limit ( and disable basic model if token total is close to its max)
 SYSTEM_PROMPT = \
 f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
@@ -41,6 +41,8 @@ from elevenlabs import generate, set_api_key, save
 from turk_lib import print_log, convert_complete_number_string, web_search, fetch_wikipedia_article, markdown_browser
 from fast_local_tts import text_to_mp3
 from fast_local_sr import fast_transcribe
+
+LIBDIR = '.'
 
 # TTS setup
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/voices"
@@ -244,11 +246,11 @@ def process_user_speech(filename):
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory(LIBDIR, 'index.html')
 
 @app.route('/lite')
 def lite_index():
-    return send_from_directory('.', 'lite.html')
+    return send_from_directory(LIBDIR, 'lite.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -305,7 +307,7 @@ def response_file(filename):
 def serve_js(filename):
     try:
         secure_filename_str = secure_filename(f"{filename}.js")
-        return send_from_directory('.', secure_filename_str)
+        return send_from_directory(LIBDIR, secure_filename_str)
     except FileNotFoundError:
         # Log an error message or return a custom 404 error
         return "File not found", 404
@@ -314,7 +316,7 @@ def serve_js(filename):
 def serve_css(filename):
     try:
         secure_filename_str = secure_filename(f"{filename}.css")
-        return send_from_directory('.', secure_filename_str)
+        return send_from_directory(LIBDIR, secure_filename_str)
     except FileNotFoundError:
         # Log an error message or return a custom 404 error
         return "File not found", 404
@@ -359,7 +361,7 @@ def get_version():
 
 @app.route('/favicon.ico')
 def favicon():
-    return send_from_directory('.', 'favicon.ico', mimetype='image/x-icon')
+    return send_from_directory(LIBDIR, 'favicon.ico', mimetype='image/x-icon')
 
 if __name__ == '__main__':
     print_log(f"v{VERSION}: Initialising...")
