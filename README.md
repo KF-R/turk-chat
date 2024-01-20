@@ -22,6 +22,8 @@
 
 ### Usage:
 * Install requirements
+  - `sudo apt install portaudio-dev19`
+  - `pip install -r requirements.txt`
 * Set up API keys (See below and/or `my_env.py.example`)
 * Launch `turk_flask.py`, which is a Python Flask application.  
 * Visit localhost port 5000 in your browser (e.g. `https://127.0.0.1:5000/`)
