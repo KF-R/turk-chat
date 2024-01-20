@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 
 CONTACT_EMAIL = 'your_email_here@example.com'
-USER_AGENT = f"turk_lib.py/0.6 ({CONTACT_EMAIL})"
+USER_AGENT = f"turk_lib.py/0.7 ({CONTACT_EMAIL})"
 wiki_wiki = wikipediaapi.Wikipedia(
     language = 'en',
     extract_format = wikipediaapi.ExtractFormat.WIKI,
@@ -123,7 +123,7 @@ def wiki_search(search_query: str, number_of_results: int = 3):
     return results
 
 def web_search(query_string: str) -> str:
-    url = 'https://www.google.com/search?q=' + quote(query)
+    url = 'https://www.google.com/search?q=' + quote(query_string)
     return f"[TOOL_RESULT]{markdown_browser(url)}[/TOOL_RESULT]"
 
 def markdown_browser(url):
