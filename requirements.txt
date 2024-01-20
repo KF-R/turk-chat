@@ -8,7 +8,6 @@ Flask_Cors==3.0.10
 huggingface_hub==0.20.2
 markdownify==0.11.6
 numpy==1.23.4
-numpy==1.21.5
 openai==1.6.1
 pydub==0.25.1
 Requests==2.31.0
