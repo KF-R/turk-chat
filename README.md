@@ -56,7 +56,8 @@ API_KEY_ELEVENLABS = '<insert_your_ElevenLabs_API_key_here>'
 <hr/>
 
 ### Note:
-The local TTS engine being used is https://balacoon.com/freeware/tts/package, which is x64-based.  You'll need to stick with the Elevenlabs API and disable/replace 'Balacoon' if you're running on another platform e.g. Arm.<p/>
+The local TTS engine being used is https://balacoon.com/freeware/tts/package, which is x64-based.
+You'll need to stick with the Elevenlabs API and disable/replace 'Balacoon' if you're running on another platform e.g. Arm.<p/>
 
 <hr/>
 v0.4.x <br/>
