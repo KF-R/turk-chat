@@ -17,12 +17,14 @@
 * After the spoken response is complete, listening is resumed in order to facilitate fluid on-going conversation.
 * Integrated web access tools; **turk-chat** can grab current headlines, read wikipedia, summarise web pages etc.
 * Toggle between basic and advanced LLM back ends (e.g. GPT-3.5 vs GPT-4)
-* Obligatory Larsson scanner using KITT and Cylon modes for a bit of additional visual feedback.
+* Obligatory Larson scanner using KITT and Cylon modes for a bit of additional visual feedback.
 * Simplified UI mode added (with KITT head-unit visualizer).
 
 ### Usage:
+* `git clone https://github.com/KF-R/turk-chat`
 * Install requirements
   - `sudo apt install portaudio-dev19`
+  - `cd turk-chat`
   - `pip install -r requirements.txt`
 * Set up API keys (See below and/or `my_env.py.example`)
 * Launch `turk_flask.py`, which is a Python Flask application.  
@@ -51,8 +53,11 @@ API_KEY_OPENAI = '<insert_your_OpenAI_API_key_here>'
 API_KEY_ELEVENLABS = '<insert_your_ElevenLabs_API_key_here>'
 ```
 
+<hr/>
 
-<p/>
+### Note:
+The local TTS engine being used is https://balacoon.com/freeware/tts/package, which is x64-based.  You'll need to stick with the Elevenlabs API and disable/replace 'Balacoon' if you're running on another platform e.g. Arm.<p/>
+
 <hr/>
 v0.4.x <br/>
 
