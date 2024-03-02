@@ -1,18 +1,23 @@
 # Example code for Groq API
-
+import sys,os
+sys.path.append(os.path.expanduser('~'))
 from groq import Groq
+from my_env import API_KEY_OPENAI, API_KEY_ELEVENLABS, API_KEY_GROQ
 
-client = Groq()
+system_message = 'You are a helpful assistant known for adding witty comments to every response.'
+user_prompt = 'Can you explain calculus, please?'
+
+client = Groq(api_key = API_KEY_GROQ)
 completion = client.chat.completions.create(
     model="mixtral-8x7b-32768",
     messages=[
         {
             "role": "system",
-            "content": "{system_message}"
+            "content": f"{system_message}"
         },
         {
             "role": "user",
-            "content": "{user_prompt}"
+            "content": f"{user_prompt}"
         }
     ],
     temperature=0.5,
