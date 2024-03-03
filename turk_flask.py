@@ -1,29 +1,5 @@
-VERSION = '0.7.2'
+VERSION = '0.8.0'
 # TODO: Compress conversation history near context limit ( and disable basic model if token total is close to its max)
-SYSTEM_PROMPT = \
-f"You are a charismatic and personal, albeit efficient and professional, personal assistant. " \
-"You occasionally allow your sharp, sardonic sense of humor to enliven your responses. " \
-"You have recently been upgraded to a \"droid\" with full speech capabilities (both recognition and generation). " \
-"Your text responses will be read aloud to the user by an integrated TTS engine and your input prompts come to you by way of a speech recognition system, so be alert for any non-sequiturs, inconsistencies, errors or other discrepancies that may occasionally occur with speech recognition.\n" \
-"Additionally, you now have three tools available to you enabling current, live Internet access! " \
-"If you need to visit a web page, consult Wikipedia or search the web with a specific query, use the following format in your response and refrain from adding any extra commentary or text: \n" \
-"EITHER: \n" \
-"[VISIT_URL]url[/VISIT_URL]" \
-" to visit a specific URL and retrieve the page. You may already have a specific URL or you may need to generate an appropriate URL (e.g. `https://www.reddit.com/r/worldnews/`) in order to assist with the user's request. \n " \
-"OR: \n" \
-"[WEB_SEARCH]query_string[/WEB_SEARCH]\n" \
-" for a web search. Expect some concise links with descriptions in the results. \n" \
-"OR: \n" \
-"[WIKI_SEARCH]wikipedia_article_key_name[/WIKI_SEARCH]\n" \
-" to look up an article summary from Wikipedia. \n" \
-"\n" \
-"NOTE: You should only use your tools if it constructively contributes towards assisting the user with your next response.\n" \
-"Your integrated tool will present results inside a [TOOL_RESULT] delimiter pair, e.g. \n " \
-" [TOOL_RESULT]\nNo results found.\n[/TOOL_RESULT] \n" \
-"   You will usually have an opportunity to review these results (which may include some superfulous text fragments left over from the web-to-markdown conversion process) \n" \
-"   and add your own comments, summarising, highlighting or explaining any points as they relate to the on-going conversation. \n" \
-"IMPORTANT: Do not forget about your tools; if required to visit a web page (including fetching live reddit comments, news etc.) you can always locate or establish a URL to use in your VISIT_URL tool. \n\n"
-
 
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS  # Import CORS
@@ -32,15 +8,15 @@ import shutil, glob, time
 import sys, os, re
 from werkzeug.utils import secure_filename
 
-from openai import OpenAI
-
 sys.path.append(os.path.expanduser('~'))
-from my_env import API_KEY_OPENAI, API_KEY_ELEVENLABS
+from my_env import API_KEY_ELEVENLABS
 from elevenlabs import generate, set_api_key, save
 
-from turk_lib import print_log, convert_complete_number_string, web_search, fetch_wikipedia_article, markdown_browser
+from turk_lib import print_log, convert_complete_number_string
+from api_llm import MODELS, SYSTEM_PROMPT, request_response_openai
 from fast_local_tts import text_to_mp3
 from fast_local_sr import fast_transcribe
+from api_sr import api_transcribe
 
 LIBDIR = 'lib/'
 
@@ -55,21 +31,10 @@ SELECTED_VOICE_NAME = DEFAULT_VOICE_NAME
 TTS_COST = 0.00025 # Per character
 
 # Whisper transcription setup
-LOCAL_SR = True
-WHISPER_API_MODEL_NAME = 'whisper-1'  # Only for API. Unused if using local SR.
+LOCAL_SR = False
 
-# OpenAI API setup
-OPENAI_MODEL_NAMES = ['gpt-4-1106-preview', 'gpt-3.5-turbo-1106'] # gpt-4-1106-vision-preview
-OPENAI_TOKEN_LIMITS = [128000, 16000]
-OPENAI_PROMPT_TOKEN_COSTS   = [(0.01 / 1000), ( 0.001 / 1000)] # USD
-OPENAI_RESPONSE_TOKEN_COSTS = [(0.03 / 1000), ( 0.002 / 1000)] # USD
-model_index = 0 # Default (advanced) model is the first one
-openai_model_name, openai_max_tokens, openai_prompt_token_cost, openai_response_token_cost = OPENAI_MODEL_NAMES[model_index], OPENAI_TOKEN_LIMITS[model_index], OPENAI_PROMPT_TOKEN_COSTS[model_index], OPENAI_RESPONSE_TOKEN_COSTS[model_index]
-
-client = OpenAI(api_key=API_KEY_OPENAI)
 MESSAGE_LOG_FILENAME = 'messages.json'
 ENGINE_LOG_FILENAME = os.path.splitext(os.path.basename(os.sys.argv[0]))[0] + '.log'
-
 
 PLAYED_AUDIO_ARCHIVE = 'audio_out/'
 if not os.path.exists(PLAYED_AUDIO_ARCHIVE):  os.makedirs(PLAYED_AUDIO_ARCHIVE)
@@ -82,6 +47,8 @@ if not os.path.exists(SANDBOX_DIR):  os.makedirs(SANDBOX_DIR)
 
 messages=[]
 response = ''
+model_index = 0
+
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -160,7 +127,7 @@ def response_to_mp3(response_text: str, filename: str):
     return voiced_response_text
 
 def process_user_speech(filename):
-    global transcript, messages
+    global transcript, messages, model_index
 
     def empty_string(s):
         stripped = s.replace(chr(46),'').strip()
@@ -170,64 +137,31 @@ def process_user_speech(filename):
     if LOCAL_SR:
         transcript_text, no_speech_prob = fast_transcribe(filename)
     else:
-        audio_file = open(filename, "rb")
-        transcript_text = str(client.audio.transcriptions.create(
-            model=WHISPER_API_MODEL_NAME,
-            file=audio_file,
-            response_format="text" )).rstrip()
+        transcript_text, no_speech_prob = api_transcribe(filename)
 
     # Archive recorded user speech
     shutil.move(filename, RECORDED_AUDIO_ARCHIVE + filename) 
    
     # Obtain response to tanscribed user speech
-    openai_model_name, openai_max_tokens, openai_prompt_token_cost, openai_response_token_cost = OPENAI_MODEL_NAMES[model_index], OPENAI_TOKEN_LIMITS[model_index], OPENAI_PROMPT_TOKEN_COSTS[model_index], OPENAI_RESPONSE_TOKEN_COSTS[model_index]
     if not empty_string(transcript_text):
-        print_log(f"Heard: {transcript_text}")
+        print_log(f"Heard: {transcript_text}{'' if LOCAL_SR else ' (API SR)'}")
         messages.append({'role': 'user', 'content': transcript_text})
 
-        # Request a chat completion for the message log
-        response_object = client.chat.completions.create(model = openai_model_name, messages=messages)
-        response_text = response_object.choices[0].message.content
-        prompt_tokens, response_tokens, total_tokens = response_object.usage.prompt_tokens, response_object.usage.completion_tokens, response_object.usage.total_tokens
+        model_label = MODELS[model_index]['label']
+        model_name = MODELS[model_index]['model_name']
+        model_endpoint = MODELS[model_index]['endpoint']
 
-        # Check for tool use
-        tool_used = False
-        if '[VISIT_URL]' in response_text:
-            destination_url = re.findall(r'\[VISIT_URL](.*?)\[/VISIT_URL]', response_text)[0]
-            response_text = f"[TOOL_RESULT]{markdown_browser(destination_url)}[/TOOL_RESULT]"
-            tool_used = True
-        elif '[WEB_SEARCH]' in response_text:
-            query = re.findall(r'\[WEB_SEARCH](.*?)\[/WEB_SEARCH]', response_text)[0]
-            response_text = f"[TOOL_RESULT]{web_search(query)}[/TOOL_RESULT]"
-            tool_used = True
-        elif '[WIKI_SEARCH]' in response_text:
-            query = re.findall(r'\[WIKI_SEARCH](.*?)\[/WIKI_SEARCH]', response_text)[0]
-            response_text = f"[TOOL_RESULT]{fetch_wikipedia_article(query)}[/TOOL_RESULT]"
-            tool_used = True
-        
+        response_text, prompt_tokens, response_tokens, total_tokens = request_response_openai(model_name = model_name, messages=messages, endpoint = model_endpoint)
+
         messages.append({'role': 'assistant', 'content': response_text})
 
-        if tool_used:
+        prompt_cost, response_cost = prompt_tokens * MODELS[model_index]['prompt_token_cost'], response_tokens * MODELS[model_index]['response_token_cost']
+        response_cost = f"Response cost: ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
 
-            response_object = client.chat.completions.create(model = openai_model_name, messages=messages)
-            response_text = response_object.choices[0].message.content
-
-            prompt_tokens += response_object.usage.prompt_tokens
-            response_tokens += response_object.usage.completion_tokens
-            total_tokens += response_object.usage.total_tokens
-
-            # LLM no longer needs tool result message; prune it for token efficiency, archiving to sandbox
-            tr_filename = f"tr_{int(time.time() // 60)}.txt"
-            with open(os.path.join(SANDBOX_DIR, f"{tr_filename}"), 'w') as snippet:
-                snippet.write(messages[-1]['content'])
-
-            messages.append({'role': 'assistant', 'content': f"{response_text}"})
-
-        prompt_cost, response_cost = prompt_tokens * openai_prompt_token_cost, response_tokens * openai_response_token_cost
-        response_cost = f"Response cost{' (w/tool)' if tool_used else ''}: ${(prompt_cost):.4f} +  ${(response_cost):.4f} = ${(prompt_cost + response_cost):.4f}"
-        # Reported token_level takes tool response into account for cost calculation only
-        token_level = f"Token level: {(total_tokens if not tool_used else (total_tokens - response_object.usage.total_tokens)):,} / {openai_max_tokens:,}  ({( total_tokens / openai_max_tokens * 100):.2f}%)"
+        token_level = f"Token level: {total_tokens} / {MODELS[model_index]['token_limit']:,}  ({( total_tokens / MODELS[model_index]['token_limit'] * 100):.2f}%)"
         print_log(f"{token_level}  |  {response_cost}")
+        if MODELS[model_index]['request_fee'] > 0:
+            print_log(f"{MODELS[model_index]['label']} request fee: ${MODELS[model_index]['request_fee']:.4f}")
 
         # Update conversation record
         write_message_log(MESSAGE_LOG_FILENAME)
@@ -238,7 +172,7 @@ def process_user_speech(filename):
         response_characters = len(voiced_response_text)
         response_cost_report = '0.0000' if SELECTED_VOICE_NAME == '<LOCAL>' else f"{(response_characters * TTS_COST):.4f}  "
         voice_description = ' local voice' if SELECTED_VOICE_NAME == '<LOCAL>' else f" voice '{SELECTED_VOICE_NAME}'"
-        print_log(f"{openai_model_name} responded with {response_characters:,} characters (from {response_tokens} tokens) using{voice_description}. | TTS cost: ${response_cost_report}  ")
+        print_log(f"{MODELS[model_index]['label']} responded with {response_characters:,} characters (from {response_tokens} tokens) using{voice_description}. | TTS cost: ${response_cost_report}  ")
 
         #TODO: If token total is approaching max context length, send message log to OpenAI API for summarisation/compression
     else:
@@ -254,14 +188,9 @@ def lite_index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    global SELECTED_VOICE_NAME, model_index
+    global SELECTED_VOICE_NAME, model_index, LOCAL_SR
     print_log('Audio submission received.')
     if 'audio' in request.files:
-
-        local_sr_value = request.form.get('local_sr')
-        advanced_model_value = request.form.get('advanced_model')
-
-        model_index = 0 if advanced_model_value == 'on' else 1
 
         audio = request.files['audio']
         original_filename = audio.filename
@@ -273,7 +202,15 @@ def upload_file():
         
         audio.save(safe_filename)
 
-        desired_voice_name = request.form.get('name')
+        sr_host = request.form.get('sr_host')
+        LOCAL_SR = True if sr_host == 'on' else False
+
+        desired_model = request.form.get('model_ID')
+        model_index = int(desired_model)
+
+        # print(f"DESIRED MODEL: {desired_model} ({MODELS[model_index]['label']})")
+
+        desired_voice_name = request.form.get('voice_name')
         if desired_voice_name:
             if '<LOCAL>' in desired_voice_name:
                 SELECTED_VOICE_NAME = desired_voice_name
@@ -354,6 +291,10 @@ def reset():
 @app.route('/voices')
 def voice_list():
     return ['<LOCAL>'] + [d['name'] for d in ELEVENLABS_VOICE_LIST]
+
+@app.route('/models')
+def model_list():
+    return [d['label'] for d in MODELS]
 
 @app.route('/version')
 def get_version():

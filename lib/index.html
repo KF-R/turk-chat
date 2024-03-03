@@ -7,11 +7,12 @@
 </head>
 <body>
     <div id="controls" align="center">
-        Model:&nbsp;&nbsp;<label class="switch">
-            <input type="checkbox" id="iq-switch" name="iq-switch"><span class="slider round"></span>
+        Local SR:&nbsp;&nbsp;<label class="switch">
+            <input type="checkbox" id="sr-switch" name="sr-switch"><span class="slider round"></span>
         </label>
-        &nbsp;&nbsp;
-        <span id="voice-selection-label">Voice: </span><select id="nameDropdown"></select>
+        <span style="margin-left:20px;" id="model-selection-label">Model:&nbsp;</span><select id="modelDropdown"></select>
+        <span style="margin-left:20px;" id="voice-selection-label">Voice:&nbsp;</span><select id="nameDropdown"></select>
+        <br/ style="margin-bottom:20px;">
         <button id="resetButton" onclick="window.location.href='/reset'">Reset</button>
         <button id="startButton" style="visibility: visible;" onclick="startRecording()">Start Listening</button>
         <button id="stopButton" disabled style="visibility: hidden;" onclick="window.location.href='/'">Stop Listening</button>

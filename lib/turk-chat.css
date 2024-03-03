@@ -17,6 +17,8 @@ button {
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    margin-left: 20px;
+    margin-bottom: 10px;
 }
 
 button:hover {
@@ -91,7 +93,7 @@ pre {
     word-wrap: break-word; /* Internet Explorer 5.5+ */
 }
 
-#nameDropdown {
+select {
     padding: 4px;  
     margin: 2px 10px; 
     border: 2px solid black; 
@@ -101,7 +103,7 @@ pre {
     width: 125px;
 }
 
-#nameDropdown:hover {
+select:hover {
     border-color: white; 
 }
 

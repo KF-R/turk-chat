@@ -4,3 +4,5 @@
 
 API_KEY_OPENAI = '<insert_your_OpenAI_API_key_here>'
 API_KEY_ELEVENLABS = '<insert_your_ElevenLabs_API_key_here>'
+API_KEY_GROQ = '<insert_your_Groq_API_key_here>'
+API_KEY_PERPLEXITY = '<insert_your_Perplexity_API_key_here>'
