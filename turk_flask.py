@@ -14,8 +14,8 @@ from elevenlabs import generate, set_api_key, save
 
 from turk_lib import print_log, convert_complete_number_string
 from api_llm import MODELS, SYSTEM_PROMPT, request_response_openai
-from fast_local_tts import text_to_mp3
-from fast_local_sr import fast_transcribe
+from local_tts import text_to_mp3
+from local_sr import fast_transcribe
 from api_sr import api_transcribe
 
 LIBDIR = 'lib/'
